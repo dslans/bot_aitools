@@ -1,0 +1,25 @@
+# Slack Bot Framework
+slack-bolt==1.18.1
+slack-sdk==3.26.1
+
+# Google Gen AI SDK
+google-genai==0.2.2
+
+# Database - BigQuery
+google-cloud-bigquery==3.13.0
+
+# Web scraping
+requests==2.31.0
+beautifulsoup4==4.12.3
+
+# Environment variables
+python-dotenv==1.0.0
+
+# Async support
+aiohttp==3.9.1
+
+# URL parsing and validation
+validators==0.22.0
+
+# Logging
+structlog==23.2.0

@@ -60,25 +60,27 @@ Features:
 
 ---
 
-## 3. Database Schema
+## 3. BigQuery Schema
 
 ```sql
-CREATE TABLE entries (
-  id SERIAL PRIMARY KEY,
-  title TEXT NOT NULL,
-  url TEXT UNIQUE,               -- for caching
-  description TEXT,              -- user-provided
-  ai_summary TEXT,               -- cached summary
-  tags TEXT[],                   -- auto-extracted tags
-  author_id TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
+-- Entries table in BigQuery
+CREATE TABLE `your-project.aitools_wiki.entries` (
+  id STRING NOT NULL,              -- UUID for entries
+  title STRING NOT NULL,
+  url STRING,                      -- for caching
+  description STRING,              -- user-provided
+  ai_summary STRING,               -- cached summary
+  tags ARRAY<STRING>,              -- auto-extracted tags
+  author_id STRING NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 );
 
-CREATE TABLE votes (
-  entry_id INT REFERENCES entries(id),
-  user_id TEXT,
-  vote INT CHECK (vote IN (-1, 1)),
-  PRIMARY KEY(entry_id, user_id)
+-- Votes table in BigQuery
+CREATE TABLE `your-project.aitools_wiki.votes` (
+  entry_id STRING NOT NULL,        -- References entries.id
+  user_id STRING NOT NULL,
+  vote INT64 NOT NULL,             -- 1 for upvote, -1 for downvote
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 );
 ```
 
@@ -95,7 +97,7 @@ CREATE TABLE votes (
    - Application Default Credentials: `gcloud auth application-default login`
 4. **Python Dependencies**:
    ```bash
-   pip install google-genai slack-bolt psycopg2-binary beautifulsoup4 requests
+   pip install google-genai google-cloud-bigquery slack-bolt beautifulsoup4 requests
    ```
 
 ### Gemini Model Configuration
@@ -174,13 +176,19 @@ def parse_ai_response(response_text):
 ### Search
 
 ```sql
-SELECT e.id, e.title, e.ai_summary, e.tags, COALESCE(SUM(v.vote), 0) AS score
-FROM entries e
-LEFT JOIN votes v ON e.id = v.entry_id
-WHERE e.title ILIKE %keyword%
-   OR e.ai_summary ILIKE %keyword%
-   OR %keyword% = ANY(e.tags)
-GROUP BY e.id
+SELECT 
+  e.id, 
+  e.title, 
+  e.ai_summary, 
+  e.tags, 
+  COALESCE(SUM(v.vote), 0) AS score
+FROM `your-project.aitools_wiki.entries` e
+LEFT JOIN `your-project.aitools_wiki.votes` v ON e.id = v.entry_id
+WHERE 
+  LOWER(e.title) LIKE LOWER(CONCAT('%', @keyword, '%'))
+  OR LOWER(e.ai_summary) LIKE LOWER(CONCAT('%', @keyword, '%'))
+  OR @keyword IN UNNEST(e.tags)
+GROUP BY e.id, e.title, e.ai_summary, e.tags
 ORDER BY score DESC
 LIMIT 5;
 ```
@@ -189,7 +197,7 @@ LIMIT 5;
 
 * Same as above but:
 
-  * If `tag` provided → `WHERE %tag% = ANY(e.tags)`
+  * If `tag` provided → `WHERE @tag IN UNNEST(e.tags)`
   * Else → no filter.
 
 ---

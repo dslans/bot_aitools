@@ -1,0 +1,246 @@
+"""
+Handler for /aitools add command.
+"""
+
+import logging
+import asyncio
+from typing import Optional, Tuple
+from slack_bolt import App
+
+from services.ai_service import ai_service
+from services.bigquery_service import bigquery_service
+from services.scraper_service import scraper_service
+
+logger = logging.getLogger(__name__)
+
+def register_add_handler(app: App):
+    """Register the /aitools add command handler."""
+    
+    @app.command("/aitools add")
+    def handle_add_command(ack, say, command):
+        """Handle the /aitools add command."""
+        ack()
+        
+        # Parse the command text
+        text = command.get('text', '').strip()
+        user_id = command.get('user_id')
+        
+        if not text:
+            say("❌ Please provide a title and URL/description.\n"
+                "Format: `/aitools add <title> | <url or description>`\n"
+                "Example: `/aitools add Aider | https://github.com/paul-gauthier/aider`")
+            return
+        
+        # Parse title and content
+        title, content = parse_add_command(text)
+        
+        if not title or not content:
+            say("❌ Invalid format. Please use: `<title> | <url or description>`")
+            return
+        
+        # Show processing message
+        say("🔄 Processing your request... This may take a moment while I analyze the tool.")
+        
+        # Process the entry
+        try:
+            entry_id = process_add_entry(title, content, user_id)
+            
+            if entry_id:
+                # Get the entry with score for display
+                entry = bigquery_service.get_entry_with_score(entry_id)
+                if entry:
+                    response = format_entry_response(entry)
+                    say(response)
+                else:
+                    say("✅ Tool added successfully!")
+            else:
+                say("❌ Sorry, I couldn't process that tool. Please try again.")
+                
+        except Exception as e:
+            logger.error(f"Error processing add command: {e}")
+            say("❌ An error occurred while processing your request. Please try again.")
+
+def parse_add_command(text: str) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Parse the add command text to extract title and content.
+    
+    Args:
+        text: The command text
+        
+    Returns:
+        Tuple of (title, content) or (None, None) if invalid
+    """
+    if '|' not in text:
+        return None, None
+    
+    parts = text.split('|', 1)
+    if len(parts) != 2:
+        return None, None
+    
+    title = parts[0].strip()
+    content = parts[1].strip()
+    
+    if not title or not content:
+        return None, None
+    
+    return title, content
+
+def process_add_entry(title: str, content: str, user_id: str) -> Optional[str]:
+    """
+    Process a new entry by scraping, generating AI content, and saving to database.
+    
+    Args:
+        title: Entry title
+        content: URL or description
+        user_id: Slack user ID
+        
+    Returns:
+        Entry ID if successful, None otherwise
+    """
+    url = None
+    description = None
+    scraped_content = None
+    
+    # Check if content is a URL
+    if scraper_service.is_valid_url(content):
+        url = content
+        
+        # Check if we already have this URL cached
+        existing_entry = bigquery_service.get_entry_by_url(url)
+        if existing_entry:
+            logger.info(f"Found existing entry for URL: {url}")
+            return existing_entry['id']
+        
+        # Scrape content from URL
+        scraped_title, scraped_content = scraper_service.scrape_content(url)
+        
+        # Use scraped title if provided title is generic
+        if scraped_title and len(scraped_title) > len(title):
+            title = scraped_title
+        
+        # Use scraped content for AI analysis
+        content_for_ai = scraped_content if scraped_content else content
+    else:
+        # Content is a description
+        description = content
+        content_for_ai = content
+    
+    # Generate AI summary and tags
+    try:
+        ai_summary, tags = ai_service.generate_summary_and_tags_sync(title, content_for_ai)
+    except Exception as e:
+        logger.error(f"Error generating AI content: {e}")
+        ai_summary, tags = None, []
+    
+    # Create the entry
+    try:
+        entry_id = bigquery_service.create_entry(
+            title=title,
+            url=url,
+            description=description,
+            ai_summary=ai_summary,
+            tags=tags,
+            author_id=user_id
+        )
+        return entry_id
+    except Exception as e:
+        logger.error(f"Error creating entry: {e}")
+        return None
+
+def format_entry_response(entry: dict) -> str:
+    """
+    Format an entry for Slack display.
+    
+    Args:
+        entry: Entry dictionary with score information
+        
+    Returns:
+        Formatted Slack message
+    """
+    # Build the response
+    response_parts = [f"✅ Added *{entry['title']}*"]
+    
+    # Add URL if present
+    if entry['url']:
+        response_parts.append(f"🔗 {entry['url']}")
+    
+    # Add AI summary if present
+    if entry['ai_summary']:
+        response_parts.append(f"📝 {entry['ai_summary']}")
+    
+    # Add tags if present
+    if entry['tags']:
+        tags_str = ', '.join(entry['tags'])
+        response_parts.append(f"🏷️ Tags: {tags_str}")
+    
+    # Add vote counts
+    score = entry.get('score', 0)
+    upvotes = entry.get('upvotes', 0)
+    downvotes = entry.get('downvotes', 0)
+    
+    response_parts.append(f"👍 {upvotes} | 👎 {downvotes}")
+    
+    # Add voting buttons
+    voting_blocks = create_voting_blocks(entry['id'], score)
+    
+    response = '\n'.join(response_parts)
+    
+    return {
+        "text": response,
+        "blocks": [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": response
+                }
+            },
+            voting_blocks
+        ]
+    }
+
+def create_voting_blocks(entry_id: str, current_score: int) -> dict:
+    """
+    Create Slack blocks for voting buttons.
+    
+    Args:
+        entry_id: The entry ID
+        current_score: Current vote score
+        
+    Returns:
+        Slack block elements
+    """
+    return {
+        "type": "actions",
+        "block_id": f"voting_{entry_id}",
+        "elements": [
+            {
+                "type": "button",
+                "text": {
+                    "type": "plain_text",
+                    "text": "👍 Upvote"
+                },
+                "style": "primary",
+                "action_id": f"upvote_{entry_id}",
+                "value": entry_id
+            },
+            {
+                "type": "button",
+                "text": {
+                    "type": "plain_text",
+                    "text": "👎 Downvote"
+                },
+                "action_id": f"downvote_{entry_id}",
+                "value": entry_id
+            },
+            {
+                "type": "button",
+                "text": {
+                    "type": "plain_text",
+                    "text": f"Score: {current_score:+d}" if current_score != 0 else "Score: 0"
+                },
+                "action_id": f"score_{entry_id}",
+                "value": entry_id
+            }
+        ]
+    }
