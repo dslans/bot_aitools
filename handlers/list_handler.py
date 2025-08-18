@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 def register_list_handler(app: App):
     """Register the /aitools list command handler."""
     
-    @app.command("/aitools list")
+    @app.command("/aitools-list")
     def handle_list_command(ack, say, command):
         """Handle the /aitools list command."""
         ack()
@@ -144,31 +144,50 @@ def format_list_results(tag: Optional[str], entries: List[Dict[str, Any]]) -> di
             }
         }
         
-        # Add voting buttons for each entry
+        blocks.append(entry_block)
+        
+        # Add voting buttons for each entry (as separate action block)
         if entry.get('id'):
-            voting_elements = create_entry_voting_buttons(entry)
-            entry_block["accessory"] = {
-                "type": "overflow",
-                "options": [
+            voting_block = {
+                "type": "actions",
+                "block_id": f"voting_{entry['id']}",
+                "elements": [
                     {
+                        "type": "button",
                         "text": {
                             "type": "plain_text",
-                            "text": f"👍 Upvote (Score: {entry.get('score', 0):+d})"
+                            "text": "👍 Upvote"
                         },
-                        "value": f"upvote_{entry['id']}"
+                        "style": "primary",
+                        "action_id": f"upvote_{entry['id']}",
+                        "value": entry['id']
                     },
                     {
+                        "type": "button",
                         "text": {
                             "type": "plain_text",
-                            "text": f"👎 Downvote (Score: {entry.get('score', 0):+d})"
+                            "text": "👎 Downvote"
                         },
-                        "value": f"downvote_{entry['id']}"
+                        "style": "danger",  # Make downvote button red
+                        "action_id": f"downvote_{entry['id']}",
+                        "value": entry['id']
                     }
-                ],
-                "action_id": f"vote_menu_{entry['id']}"
+                ]
             }
-        
-        blocks.append(entry_block)
+            blocks.append(voting_block)
+            
+            # Add score as a context block (text only)
+            score_text = f"Score: {entry.get('score', 0):+d}" if entry.get('score', 0) != 0 else "Score: 0"
+            score_block = {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f"📊 {score_text}"
+                    }
+                ]
+            }
+            blocks.append(score_block)
         
         # Add divider between entries (except after the last one)
         if i < len(entries):

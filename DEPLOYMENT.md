@@ -27,26 +27,57 @@ gcloud services enable bigquery.googleapis.com
 ### Create Service Account
 
 ```bash
+# Set your project ID (replace with your actual project ID)
+PROJECT_ID="YOUR_PROJECT_ID"
+echo "Using project: $PROJECT_ID"
+
 # Create service account
+echo "Creating service account..."
 gcloud iam service-accounts create aitools-bot \
-    --display-name="AI Tools Wiki Bot"
+    --display-name="AI Tools Wiki Bot Service Account" \
+    --description="Service account for AI Tools Wiki Slack Bot"
+
+# Wait for service account to propagate
+echo "Waiting for service account to be created..."
+sleep 10
+
+# Verify service account exists
+gcloud iam service-accounts describe aitools-bot@$PROJECT_ID.iam.gserviceaccount.com \
+    --format="value(email)" || {
+    echo "❌ Service account creation failed. Please try again."
+    exit 1
+}
+
+echo "✅ Service account created successfully"
 
 # Grant necessary roles
-gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
-    --member="serviceAccount:aitools-bot@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/aiplatform.user"
+echo "Granting permissions..."
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:aitools-bot@$PROJECT_ID.iam.gserviceaccount.com" \
+    --role="roles/aiplatform.user" \
+    --condition=None
 
-gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
-    --member="serviceAccount:aitools-bot@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/bigquery.dataEditor"
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:aitools-bot@$PROJECT_ID.iam.gserviceaccount.com" \
+    --role="roles/bigquery.dataEditor" \
+    --condition=None
 
-gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
-    --member="serviceAccount:aitools-bot@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/bigquery.jobUser"
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:aitools-bot@$PROJECT_ID.iam.gserviceaccount.com" \
+    --role="roles/bigquery.jobUser" \
+    --condition=None
+
+echo "✅ Permissions granted successfully"
+
+# Wait for permissions to propagate
+sleep 5
 
 # Create and download service account key
+echo "Creating service account key..."
 gcloud iam service-accounts keys create aitools-bot-key.json \
-    --iam-account=aitools-bot@YOUR_PROJECT_ID.iam.gserviceaccount.com
+    --iam-account=aitools-bot@$PROJECT_ID.iam.gserviceaccount.com
+
+echo "✅ Service account key created at aitools-bot-key.json"
 ```
 
 ## 2. Slack App Setup
@@ -74,9 +105,9 @@ Add these Bot Token Scopes:
 Create these slash commands (replace YOUR_DOMAIN with your deployment URL):
 
 1. `/aitools` - `https://YOUR_DOMAIN/slack/events` - "Show help for AI Tools Wiki Bot"
-2. `/aitools add` - `https://YOUR_DOMAIN/slack/events` - "Add a new AI tool"
-3. `/aitools search` - `https://YOUR_DOMAIN/slack/events` - "Search for AI tools"
-4. `/aitools list` - `https://YOUR_DOMAIN/slack/events` - "List trending AI tools"
+2. `/aitools-add` - `https://YOUR_DOMAIN/slack/events` - "Add a new AI tool"
+3. `/aitools-search` - `https://YOUR_DOMAIN/slack/events` - "Search for AI tools"
+4. `/aitools-list` - `https://YOUR_DOMAIN/slack/events` - "List trending AI tools"
 
 ### Enable Socket Mode (for local development)
 

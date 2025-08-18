@@ -30,8 +30,9 @@ class AIService:
             )
             logger.info("AI service initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize AI service: {e}")
-            raise
+            logger.warning(f"AI service initialization failed: {e}")
+            logger.warning("Bot will continue without AI features")
+            self.client = None
     
     async def generate_summary_and_tags(self, title: str, content: str) -> Tuple[Optional[str], List[str]]:
         """
@@ -56,7 +57,7 @@ class AIService:
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     temperature=0.7,
-                    max_output_tokens=500,
+                    max_output_tokens=1000,  # Increased for gemini-2.5 which uses thought tokens
                 )
             )
             
@@ -68,4 +69,64 @@ class AIService:
     
     def _build_prompt(self, title: str, content: str) -> str:
         """Build the prompt for AI generation."""
-        return f\"\"\"Analyze this AI coding tool and provide:\n1. A concise summary (max 100 words) that explains what the tool does and its key benefits\n2. Up to 5 relevant tags for categorization (use lowercase, hyphenated format)\n\nTool: {title}\nContent: {content[:2000]}  # Limit content to avoid token limits\n\nFormat your response as:\nSUMMARY: [your summary here]\nTAGS: [tag1, tag2, tag3, ...]\n\nFocus on:\n- What the tool does\n- Key features or benefits\n- Target use cases\n- Technology stack (if mentioned)\n\nFor tags, use categories like:\n- ai-assistant, code-generation, debugging, testing, cli, web-app\n- python, javascript, typescript, etc. (for languages)\n- vscode, intellij, terminal (for platforms)\n- pair-programming, code-review, documentation (for use cases)\"\"\"\n    \n    def _parse_ai_response(self, response_text: str) -> Tuple[Optional[str], List[str]]:\n        \"\"\"Parse the AI response to extract summary and tags.\"\"\"\n        if not response_text:\n            return None, []\n        \n        lines = response_text.strip().split('\\n')\n        summary = None\n        tags = []\n        \n        for line in lines:\n            line = line.strip()\n            if line.upper().startswith(\"SUMMARY:\"):\n                summary = line[8:].strip()  # Remove \"SUMMARY:\" prefix\n            elif line.upper().startswith(\"TAGS:\"):\n                tags_str = line[5:].strip()  # Remove \"TAGS:\" prefix\n                # Parse tags, handling both comma and bracket formats\n                if tags_str.startswith('[') and tags_str.endswith(']'):\n                    tags_str = tags_str[1:-1]\n                \n                tags = [tag.strip().lower() for tag in tags_str.split(',') if tag.strip()]\n                tags = [tag for tag in tags if len(tag) > 0 and len(tag) <= 30]  # Filter valid tags\n        \n        # Fallback: if no explicit SUMMARY/TAGS format, try to extract from plain text\n        if not summary and response_text:\n            # Take first 100 words as summary if no explicit format\n            words = response_text.split()\n            if words:\n                summary = ' '.join(words[:100])\n        \n        return summary, tags[:5]  # Limit to 5 tags max\n    \n    def generate_summary_and_tags_sync(self, title: str, content: str) -> Tuple[Optional[str], List[str]]:\n        \"\"\"Synchronous wrapper for generate_summary_and_tags.\"\"\"\n        return asyncio.run(self.generate_summary_and_tags(title, content))\n\n# Global AI service instance\nai_service = AIService()
+        return f"""Analyze this AI coding tool and provide:
+1. A concise summary (max 100 words) that explains what the tool does and its key benefits
+2. Who this tool would be best suited for
+3. Up to 5 relevant tags for categorization (use lowercase, hyphenated format)
+
+Tool: {title}
+Content: {content[:2000]}
+
+Format your response as:
+SUMMARY: [your summary here]
+TAGS: [tag1, tag2, tag3, ...]
+
+Focus on:
+- What the tool does
+- Key features or benefits
+- Target use cases
+- Technology stack (if mentioned)
+
+For tags, use categories like:
+- ai-assistant, code-generation, debugging, testing, cli, web-app
+- python, javascript, typescript, etc. (for languages)
+- vscode, intellij, terminal (for platforms)
+- pair-programming, code-review, documentation (for use cases)"""
+    
+    def _parse_ai_response(self, response_text: str) -> Tuple[Optional[str], List[str]]:
+        """Parse the AI response to extract summary and tags."""
+        if not response_text:
+            return None, []
+        
+        lines = response_text.strip().split('\n')
+        summary = None
+        tags = []
+        
+        for line in lines:
+            line = line.strip()
+            if line.upper().startswith("SUMMARY:"):
+                summary = line[8:].strip()  # Remove "SUMMARY:" prefix
+            elif line.upper().startswith("TAGS:"):
+                tags_str = line[5:].strip()  # Remove "TAGS:" prefix
+                # Parse tags, handling both comma and bracket formats
+                if tags_str.startswith('[') and tags_str.endswith(']'):
+                    tags_str = tags_str[1:-1]
+                
+                tags = [tag.strip().lower() for tag in tags_str.split(',') if tag.strip()]
+                tags = [tag for tag in tags if len(tag) > 0 and len(tag) <= 30]  # Filter valid tags
+        
+        # Fallback: if no explicit SUMMARY/TAGS format, try to extract from plain text
+        if not summary and response_text:
+            # Take first 100 words as summary if no explicit format
+            words = response_text.split()
+            if words:
+                summary = ' '.join(words[:100])
+        
+        return summary, tags[:5]  # Limit to 5 tags max
+    
+    def generate_summary_and_tags_sync(self, title: str, content: str) -> Tuple[Optional[str], List[str]]:
+        """Synchronous wrapper for generate_summary_and_tags."""
+        return asyncio.run(self.generate_summary_and_tags(title, content))
+
+# Global AI service instance
+ai_service = AIService()

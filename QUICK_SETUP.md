@@ -37,29 +37,57 @@ gcloud services enable \
 
 #### C. Create Service Account
 ```bash
-# Create service account
-gcloud iam service-accounts create aitools-bot \
-    --display-name="AI Tools Wiki Bot Service Account"
-
-# Get your project ID
+# Get your project ID first
 PROJECT_ID=$(gcloud config get-value project)
+echo "Using project: $PROJECT_ID"
+
+# Create service account
+echo "Creating service account..."
+gcloud iam service-accounts create aitools-bot \
+    --display-name="AI Tools Wiki Bot Service Account" \
+    --description="Service account for AI Tools Wiki Slack Bot"
+
+# Wait a moment for service account to propagate
+echo "Waiting for service account to be created..."
+sleep 10
+
+# Verify service account exists
+gcloud iam service-accounts describe aitools-bot@$PROJECT_ID.iam.gserviceaccount.com \
+    --format="value(email)" || {
+    echo "❌ Service account creation failed. Please try again."
+    exit 1
+}
+
+echo "✅ Service account created successfully"
 
 # Grant required permissions
+echo "Granting permissions..."
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:aitools-bot@$PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/aiplatform.user"
+    --role="roles/aiplatform.user" \
+    --condition=None
 
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:aitools-bot@$PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/bigquery.dataEditor"
+    --role="roles/bigquery.dataEditor" \
+    --condition=None
 
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:aitools-bot@$PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/bigquery.jobUser"
+    --role="roles/bigquery.jobUser" \
+    --condition=None
+
+echo "✅ Permissions granted successfully"
+
+# Wait a moment for permissions to propagate
+sleep 5
 
 # Create and download service account key
+echo "Creating service account key..."
 gcloud iam service-accounts keys create ~/aitools-bot-key.json \
     --iam-account=aitools-bot@$PROJECT_ID.iam.gserviceaccount.com
+
+echo "✅ Service account key created at ~/aitools-bot-key.json"
 ```
 
 **📝 Note**: Save the path to `~/aitools-bot-key.json` - you'll need it later.
@@ -102,9 +130,9 @@ gcloud iam service-accounts keys create ~/aitools-bot-key.json \
 | Command | Description | Usage Hint |
 |---------|-------------|------------|
 | `/aitools` | Show help for AI Tools Wiki Bot | |
-| `/aitools add` | Add a new AI tool | `<title> \| <url or description>` |
-| `/aitools search` | Search for AI tools | `<keyword>` |
-| `/aitools list` | List trending AI tools | `[tag]` |
+| `/aitools-add` | Add a new AI tool | `<title> \| <url or description>` |
+| `/aitools-search` | Search for AI tools | `<keyword>` |
+| `/aitools-list` | List trending AI tools | `[tag]` |
 
 #### E. Install App to Workspace
 1. Go to **"Install App"** in the left sidebar
@@ -209,17 +237,17 @@ INFO - Starting bot in Socket Mode for local development...
 
 **Test adding a tool:**
 ```
-/aitools add Cursor | https://cursor.sh
+/aitools-add Cursor | https://cursor.sh
 ```
 
 **Test search:**
 ```
-/aitools search cursor
+/aitools-search cursor
 ```
 
 **Test list:**
 ```
-/aitools list
+/aitools-list
 ```
 
 ### 5. 🐛 Troubleshooting

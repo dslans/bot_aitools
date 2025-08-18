@@ -14,17 +14,17 @@ Got it ✅ — let’s roll all three features in:
 A **Slack-integrated wiki with Reddit-style voting**, focused on AI coding tools.
 Features:
 
-* Add tools via `/aitools add <title> | <url or description>`.
+* Add tools via `/aitools-add <title> | <url or description>`.
 * AI auto-generates a **summary** and **tags** for each tool.
 * Prevent duplicate work with **cache** (entries stored in DB).
 * Community **upvotes/downvotes** directly in Slack.
-* Browse/search entries with `/aitools search` and `/aitools list`.
+* Browse/search entries with `/aitools-search` and `/aitools-list`.
 
 ---
 
 ## 2. Slash Commands
 
-### `/aitools add <title> | <url or description>`
+### `/aitools-add <title> | <url or description>`
 
 * User submits new entry.
 * Bot:
@@ -42,7 +42,7 @@ Features:
   👍 0 | 👎 0
   ```
 
-### `/aitools search <keyword>`
+### `/aitools-search <keyword>`
 
 * Searches across:
 
@@ -51,7 +51,7 @@ Features:
   * `ai_summary` text
 * Returns top 3–5 matching tools with scores.
 
-### `/aitools list [tag]`
+### `/aitools-list [tag]`
 
 * Lists trending tools:
 
@@ -207,7 +207,7 @@ LIMIT 5;
 **Add**
 
 ```
-/aitools add Aider | https://github.com/paul-gauthier/aider
+/aitools-add Aider | https://github.com/paul-gauthier/aider
 ```
 
 Response:
@@ -223,7 +223,7 @@ Response:
 **Search**
 
 ```
-/aitools search cli
+/aitools-search cli
 ```
 
 Response:
@@ -237,7 +237,7 @@ Top results for *cli*:
 **List**
 
 ```
-/aitools list pair-programming
+/aitools-list pair-programming
 ```
 
 Response:

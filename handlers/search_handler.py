@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 def register_search_handler(app: App):
     """Register the /aitools search command handler."""
     
-    @app.command("/aitools search")
+    @app.command("/aitools-search")
     def handle_search_command(ack, say, command):
         """Handle the /aitools search command."""
         ack()

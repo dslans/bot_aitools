@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 def register_add_handler(app: App):
     """Register the /aitools add command handler."""
     
-    @app.command("/aitools add")
+    @app.command("/aitools-add")
     def handle_add_command(ack, say, command):
         """Handle the /aitools add command."""
         ack()
@@ -147,7 +147,7 @@ def process_add_entry(title: str, content: str, user_id: str) -> Optional[str]:
         logger.error(f"Error creating entry: {e}")
         return None
 
-def format_entry_response(entry: dict) -> str:
+def format_entry_response(entry: dict) -> dict:
     """
     Format an entry for Slack display.
     
@@ -155,7 +155,7 @@ def format_entry_response(entry: dict) -> str:
         entry: Entry dictionary with score information
         
     Returns:
-        Formatted Slack message
+        Formatted Slack message with blocks
     """
     # Build the response
     response_parts = [f"✅ Added *{entry['title']}*"]
@@ -180,32 +180,32 @@ def format_entry_response(entry: dict) -> str:
     
     response_parts.append(f"👍 {upvotes} | 👎 {downvotes}")
     
-    # Add voting buttons
-    voting_blocks = create_voting_blocks(entry['id'], score)
-    
     response = '\n'.join(response_parts)
+    
+    # Create blocks with voting buttons and score text
+    blocks = [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": response
+            }
+        },
+        create_voting_blocks(entry['id']),
+        create_score_block(score)
+    ]
     
     return {
         "text": response,
-        "blocks": [
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": response
-                }
-            },
-            voting_blocks
-        ]
+        "blocks": blocks
     }
 
-def create_voting_blocks(entry_id: str, current_score: int) -> dict:
+def create_voting_blocks(entry_id: str) -> dict:
     """
     Create Slack blocks for voting buttons.
     
     Args:
         entry_id: The entry ID
-        current_score: Current vote score
         
     Returns:
         Slack block elements
@@ -230,17 +230,30 @@ def create_voting_blocks(entry_id: str, current_score: int) -> dict:
                     "type": "plain_text",
                     "text": "👎 Downvote"
                 },
+                "style": "danger",  # Make downvote button red
                 "action_id": f"downvote_{entry_id}",
                 "value": entry_id
-            },
+            }
+        ]
+    }
+
+def create_score_block(score: int) -> dict:
+    """
+    Create a score display block (text only).
+    
+    Args:
+        score: Current score
+        
+    Returns:
+        Slack context block
+    """
+    score_text = f"Score: {score:+d}" if score != 0 else "Score: 0"
+    return {
+        "type": "context",
+        "elements": [
             {
-                "type": "button",
-                "text": {
-                    "type": "plain_text",
-                    "text": f"Score: {current_score:+d}" if current_score != 0 else "Score: 0"
-                },
-                "action_id": f"score_{entry_id}",
-                "value": entry_id
+                "type": "mrkdwn",
+                "text": f"📊 {score_text}"
             }
         ]
     }
