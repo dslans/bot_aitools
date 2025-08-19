@@ -7,6 +7,7 @@ import sys
 import os
 import logging
 from typing import List, Dict
+from flask import Flask, request, jsonify
 
 # Check Python version early
 if sys.version_info < (3, 9):
@@ -16,6 +17,7 @@ if sys.version_info < (3, 9):
     sys.exit(1)
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
+from slack_bolt.adapter.flask import SlackRequestHandler
 
 from config.settings import settings
 from handlers.add_handler import register_add_handler
@@ -24,6 +26,7 @@ from handlers.list_handler import register_list_handler
 from handlers.admin_handler import register_admin_handler
 from handlers.tags_handler import register_tags_handler
 from handlers.suggest_tag_handler import register_suggest_tag_handler
+from handlers.top_handler import handle_aitools_top
 
 # Configure logging
 logging.basicConfig(
@@ -133,6 +136,12 @@ def create_app():
     # Register global voting handlers for buttons
     register_global_voting_handlers(app)
     
+    # Register the /aitools-top command
+    @app.command("/aitools-top")
+    def aitools_top_command(ack, say, client, command, context):
+        """Handle /aitools-top command."""
+        handle_aitools_top(ack, say, client, command, context)
+    
     # Help command (main /aitools command)
     @app.command("/aitools")
     def aitools_help(ack, say, command):
@@ -145,6 +154,7 @@ def create_app():
 • `/aitools-add <title> | <url or description>` - Add a new AI tool
 • `/aitools-search <keyword>` - Search for tools by keyword
 • `/aitools-list [tag]` - List trending tools (optionally filtered by tag)
+• `/aitools-top [limit]` - Show top AI tools by score (default: 10, max: 50)
 • `/aitools-tags` - Show all available tags for filtering
 • `/aitools-suggest-tag <entry_id> <tag>` - Suggest community tags for entries
 
@@ -152,6 +162,7 @@ def create_app():
 • `/aitools-add Aider | https://aider.chat/`
 • `/aitools-search code-assistant`
 • `/aitools-list python`
+• `/aitools-top` or `/aitools-top 5`
 • `/aitools-tags`
 • `/aitools-suggest-tag abc12345 machine-learning`
 
@@ -317,6 +328,27 @@ def handle_message_list(tag, say):
         logger.error(f"Error listing entries via message: {e}")
         say("❌ An error occurred while fetching the list. Please try again.")
 
+# Create Flask app for production deployment
+flask_app = Flask(__name__)
+handler = None
+
+def setup_flask_routes(slack_app):
+    """Set up Flask routes for production deployment."""
+    global handler
+    handler = SlackRequestHandler(slack_app)
+    
+    @flask_app.route("/health", methods=["GET"])
+    def health_check():
+        """Health check endpoint for Cloud Run."""
+        return jsonify({"status": "healthy"}), 200
+    
+    @flask_app.route("/slack/events", methods=["POST"])
+    def slack_events():
+        """Handle Slack events in production."""
+        return handler.handle(request)
+    
+    logger.info("Flask routes configured for production deployment")
+
 def main():
     """Main application entry point."""
     logger.info("Starting AI Tools Wiki Bot...")
@@ -328,16 +360,24 @@ def main():
     
     # Check if we're using Socket Mode (for local development)
     app_token = os.getenv('SLACK_APP_TOKEN')
+    environment = os.getenv('ENVIRONMENT', 'development')
     
-    if app_token:
+    if app_token and environment != 'production':
         # Socket Mode for local development
         logger.info("Starting bot in Socket Mode for local development...")
         handler = SocketModeHandler(app, app_token)
         handler.start()
     else:
         # HTTP Mode for production deployment
-        logger.info("Starting bot in HTTP Mode...")
-        app.start(port=int(os.environ.get("PORT", 3000)))
+        logger.info("Starting bot in HTTP Mode for production...")
+        setup_flask_routes(app)
+        
+        # In production, gunicorn will handle the Flask app
+        # For local testing of HTTP mode, we can still run Flask directly
+        if __name__ == "__main__":
+            port = int(os.environ.get("PORT", 8080))
+            logger.info(f"Starting Flask development server on port {port}")
+            flask_app.run(host="0.0.0.0", port=port, debug=False)
 
 if __name__ == "__main__":
     main()

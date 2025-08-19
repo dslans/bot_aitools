@@ -3,13 +3,13 @@ slack-bolt==1.18.1
 slack-sdk==3.26.1
 
 # Google Gen AI SDK
-google-genai==0.2.2
+google-genai==1.31.0
 
 # Database - BigQuery
 google-cloud-bigquery==3.13.0
 
 # Web scraping
-requests==2.31.0
+requests==2.32.5
 beautifulsoup4==4.12.3
 
 # Environment variables
@@ -20,6 +20,10 @@ aiohttp==3.9.1
 
 # URL parsing and validation
 validators==0.22.0
+
+# Web framework for production
+flask==2.3.3
+gunicorn==21.2.0
 
 # Logging
 structlog==23.2.0

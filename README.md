@@ -30,6 +30,7 @@
 - `/aitools-add <title> | <url or description>` - Add a new AI tool
 - `/aitools-search <keyword>` - Search for tools by content, tags, or title
 - `/aitools-list [tag]` - List trending tools with interactive voting and tag suggestion buttons
+- `/aitools-top [limit]` - Show top AI tools by score (default: 10, max: 50)
 - `/aitools-tags` - Browse all available tags (core + community-approved)
 - `/aitools-suggest-tag <entry_id> <tag>` - Suggest community tags for tools
 
@@ -71,6 +72,8 @@ Shows pending suggestions with vote counts and approve/reject buttons.
 
 ## ⚙️ Setup
 
+### Local Development
+
 1. **Install dependencies:**
    ```bash
    pip install -r requirements.txt
@@ -94,6 +97,38 @@ Shows pending suggestions with vote counts and approve/reject buttons.
    python app.py
    ```
 
+### 🚀 Production Deployment (Google Cloud Run)
+
+For production deployment, see the comprehensive [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) which covers:
+
+- Google Cloud Run setup
+- Docker containerization
+- Secret management
+- Slack app configuration
+- Monitoring and scaling
+
+**Quick Deploy:**
+```bash
+# 1. Set up Google Cloud project and authenticate
+gcloud config set project YOUR_PROJECT_ID
+
+# 2. Create secrets for Slack tokens
+echo -n 'your-bot-token' | gcloud secrets create slack-bot-token --data-file=-
+echo -n 'your-signing-secret' | gcloud secrets create slack-signing-secret --data-file=-
+
+# 3. Set up database
+python scripts/setup.py
+
+# 4. Deploy with the automated script
+./scripts/deploy.sh
+```
+
+The bot will automatically:
+- ✅ Scale from 0-10 instances based on demand
+- ✅ Handle SSL termination and health checks
+- ✅ Manage secrets securely with Google Secret Manager
+- ✅ Provide production-ready logging and monitoring
+
 ## Project Structure
 
 ```
@@ -114,7 +149,8 @@ Shows pending suggestions with vote counts and approve/reject buttons.
 │   ├── list_handler.py              # /aitools-list command
 │   ├── search_handler.py            # /aitools-search command
 │   ├── suggest_tag_handler.py       # /aitools-suggest-tag command
-│   └── tags_handler.py              # /aitools-tags command
+│   ├── tags_handler.py              # /aitools-tags command
+│   └── top_handler.py               # /aitools-top command
 ├── migrations/
 │   └── create_tag_tables.sql        # Community tag system database schema
 ├── scripts/

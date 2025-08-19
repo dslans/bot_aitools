@@ -647,6 +647,70 @@ class BigQueryService:
                 logger.error(f"Error deleting entry: {e}")
                 return False
     
+    def get_top_entries(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get the top entries by score (highest scoring first).
+        
+        Args:
+            limit: Maximum number of results to return (default: 10)
+            
+        Returns:
+            List of entry dicts with scores, ordered by score descending
+        """
+        query = f"""
+        SELECT 
+            e.id, e.title, e.url, e.description, e.ai_summary, 
+            e.target_audience, e.tags, e.author_id, e.created_at,
+            COALESCE(SUM(v.vote), 0) AS score,
+            COUNT(CASE WHEN v.vote = 1 THEN 1 END) AS upvotes,
+            COUNT(CASE WHEN v.vote = -1 THEN 1 END) AS downvotes
+        FROM `{self.table_ids['entries']}` e
+        LEFT JOIN `{self.table_ids['votes']}` v ON e.id = v.entry_id
+        GROUP BY e.id, e.title, e.url, e.description, e.ai_summary, e.target_audience, e.tags, e.author_id, e.created_at
+        ORDER BY score DESC, e.created_at DESC
+        LIMIT @limit
+        """
+        
+        try:
+            logger.info(f"Getting top {limit} entries by score")
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("limit", "INT64", limit)
+                ]
+            )
+            
+            query_job = self.client.query(query, job_config=job_config)
+            results = query_job.result()
+            
+            entries = []
+            for row in results:
+                try:
+                    entry_data = {
+                        'id': getattr(row, 'id', None),
+                        'title': getattr(row, 'title', None) or 'No title',
+                        'url': getattr(row, 'url', None),
+                        'description': getattr(row, 'description', None),
+                        'ai_summary': getattr(row, 'ai_summary', None),
+                        'target_audience': getattr(row, 'target_audience', None),
+                        'tags': list(getattr(row, 'tags', [])) if getattr(row, 'tags', None) else [],
+                        'author_id': getattr(row, 'author_id', None),
+                        'created_at': getattr(row, 'created_at', None),
+                        'score': int(getattr(row, 'score', 0)),
+                        'upvotes': int(getattr(row, 'upvotes', 0)),
+                        'downvotes': int(getattr(row, 'downvotes', 0))
+                    }
+                    entries.append(entry_data)
+                except Exception as row_error:
+                    logger.error(f"Error processing top entry row: {row_error}")
+                    continue
+            
+            logger.info(f"Successfully retrieved {len(entries)} top entries")
+            return entries
+            
+        except Exception as e:
+            logger.error(f"Error getting top entries: {e}")
+            return []
+    
     def get_all_tags(self) -> List[str]:
         """
         Get all unique tags from all entries, sorted by frequency.
