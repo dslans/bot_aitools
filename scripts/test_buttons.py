@@ -4,7 +4,7 @@ Test script to verify button creation and voting functionality
 """
 
 import sys
-sys.path.append('.')
+sys.path.append('..')
 
 from handlers.add_handler import create_voting_blocks, format_entry_response
 from services.bigquery_service import bigquery_service
@@ -18,7 +18,7 @@ def test_button_creation():
     entry_id = "test-entry-123"
     current_score = 5
     
-    blocks = create_voting_blocks(entry_id, current_score)
+    blocks = create_voting_blocks(entry_id)
     print("✅ Voting blocks created:")
     print(json.dumps(blocks, indent=2))
     

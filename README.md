@@ -2,44 +2,44 @@
 
 **Production-Ready Community Wiki** with Reddit-style voting and democratic tagging for AI coding tools. Team members can contribute, vote, and collaboratively tag tools to build a curated knowledge base.
 
-## ✨ Features
+## ✨ Key Features
 
-### Core Functionality
 - 🤖 **AI-Powered Content**: Automatic tool summaries and tagging using Google Gemini
-- 📊 **Reddit-Style Voting**: Upvote/downvote tools directly in Slack with real-time scores
+- 📊 **Reddit-Style Voting**: Upvote/downvote tools directly in Slack with real-time scores  
+- 🏷️ **Democratic Tagging**: Community-driven tag suggestions with voting approval
 - 🔍 **Smart Search**: Find tools by keywords, tags, or content with relevance ranking
+- 🚀 **One-Click UX**: Streamlined interface with interactive buttons
+- 🔧 **Admin Management**: Complete oversight tools for content moderation
 - 💾 **Intelligent Caching**: Prevents duplicate AI calls, saves costs and time
-- 🏷️ **AI Auto-Tagging**: Automatically extracts relevant tags for categorization
 
-### Community Features (NEW!)
-- 🏷️ **Community Tag Suggestions**: Users can suggest new tags for any tool
-- 🗳️ **Democratic Tag Voting**: Vote on tag suggestions with 👍/👎 buttons
-- ⚡ **Auto-Approval**: Tags with 3+ net votes automatically approved
-- 🛡️ **Admin Oversight**: Complete admin interface for managing suggestions
-- 🎯 **One-Click UX**: "Suggest Tag" buttons eliminate complex workflows
+## 🚀 Quick Start
 
-### Admin Features
-- 🔧 **Complete Admin Interface**: Manage entries, tags, and user suggestions
-- 📊 **Analytics Dashboard**: View pending suggestions with vote indicators
-- 🚀 **Manual Controls**: Approve, reject, or promote tags instantly
-- 🌡️ **Visual Indicators**: "Temperature" display for suggestion popularity
+### Essential Commands
+```bash
+# Get help
+/aitools
 
-## 💬 Commands
+# Add a new tool (AI will analyze and categorize it)
+/aitools-add Cursor | https://cursor.sh
 
-### User Commands
-- `/aitools-add <title> | <url or description>` - Add a new AI tool
-- `/aitools-search <keyword>` - Search for tools by content, tags, or title
-- `/aitools-list [tag]` - List trending tools with interactive voting and tag suggestion buttons
-- `/aitools-top [limit]` - Show top AI tools by score (default: 10, max: 50)
-- `/aitools-tags` - Browse all available tags (core + community-approved)
-- `/aitools-suggest-tag <entry_id> <tag>` - Suggest community tags for tools
+# Search for tools
+/aitools-search code-generation
 
-### Admin Commands (Requires Admin Permissions)
-- `/aitools-admin-list [limit]` - Manage all entries
-- `/aitools-admin-edit <entry_id>` - Edit entry details manually
-- `/aitools-admin-tags` - Review and manage community tag suggestions
-- `/aitools-admin-retag <entry_id>` - Regenerate AI content
-- `/aitools-admin-delete <entry_id>` - Remove entries permanently
+# List trending tools (with voting buttons)
+/aitools-list
+
+# Show top-rated tools
+/aitools-top 5
+
+# Browse available tags
+/aitools-tags
+```
+
+### Interactive Features
+- **👍/👎 Voting**: Click buttons to rate tools
+- **🏷️ Tag Suggestions**: One-click tag suggestions via buttons
+- **📊 Live Scores**: Real-time community rankings
+- **🤖 AI Analysis**: Auto-generated summaries and categorization
 
 ## 🚀 Quick Start Examples
 
@@ -99,7 +99,7 @@ Shows pending suggestions with vote counts and approve/reject buttons.
 
 ### 🚀 Production Deployment (Google Cloud Run)
 
-For production deployment, see the comprehensive [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) which covers:
+For production deployment, see the comprehensive [Deployment Guide](docs/guides/DEPLOYMENT.md) which covers:
 
 - Google Cloud Run setup
 - Docker containerization
@@ -129,7 +129,20 @@ The bot will automatically:
 - ✅ Manage secrets securely with Google Secret Manager
 - ✅ Provide production-ready logging and monitoring
 
-## Project Structure
+## 📚 Documentation
+
+### Quick Links
+- **[API Documentation](docs/api/COMMANDS.md)** - Complete command reference with examples
+- **[Deployment Guide](docs/guides/DEPLOYMENT.md)** - Production deployment to Google Cloud Run
+- **[Admin Guide](docs/admin/ADMIN_GUIDE.md)** - Admin operations and management
+- **[Setup Scripts](scripts/README.md)** - Database setup and migration guide
+
+### Detailed Guides
+- **[Community Tag System](docs/guides/COMMUNITY_TAG_SYSTEM.md)** - How the democratic tagging works
+- **[Tag Suggestion UX Guide](docs/guides/TAG_SUGGESTION_UX_GUIDE.md)** - User experience design
+- **[Project Plan](docs/guides/PROJECT_PLAN.md)** - Architecture and development roadmap
+
+## 📁 Project Structure
 
 ```
 .
@@ -143,7 +156,6 @@ The bot will automatically:
 │   ├── scraper_service.py            # Web scraping functionality
 │   └── tag_suggestions_service.py    # Community tag system
 ├── handlers/
-│   ├── __init__.py
 │   ├── add_handler.py               # /aitools-add command
 │   ├── admin_handler.py             # Admin commands (/aitools-admin-*)
 │   ├── list_handler.py              # /aitools-list command
@@ -151,17 +163,23 @@ The bot will automatically:
 │   ├── suggest_tag_handler.py       # /aitools-suggest-tag command
 │   ├── tags_handler.py              # /aitools-tags command
 │   └── top_handler.py               # /aitools-top command
-├── migrations/
-│   └── create_tag_tables.sql        # Community tag system database schema
-├── scripts/
-│   ├── setup.py                     # Complete database setup & migration
-│   └── README.md                    # Setup script documentation
 ├── docs/
-│   ├── COMMUNITY_TAG_SYSTEM.md      # Complete system documentation
-│   └── TAG_SUGGESTION_UX_GUIDE.md   # User experience guide
-├── PROJECT_PLAN.md               # Complete project plan and roadmap
-├── requirements.txt              # Python dependencies
-└── README.md                     # This file
+│   ├── api/
+│   │   └── COMMANDS.md              # Complete API documentation
+│   ├── admin/
+│   │   └── ADMIN_GUIDE.md           # Admin operations guide
+│   └── guides/
+│       ├── DEPLOYMENT.md            # Production deployment guide
+│       ├── PROJECT_PLAN.md          # Project roadmap and architecture
+│       ├── COMMUNITY_TAG_SYSTEM.md  # Tag system documentation
+│       └── TAG_SUGGESTION_UX_GUIDE.md # UX design guide
+├── migrations/
+│   └── create_tag_tables.sql        # Database schema migrations
+├── scripts/
+│   ├── setup.py                     # Complete database setup
+│   └── README.md                    # Setup documentation
+├── requirements.txt                 # Python dependencies
+└── README.md                        # This file
 ```
 
 ## Contributing
