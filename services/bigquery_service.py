@@ -746,8 +746,7 @@ class BigQueryService:
         query = f"""
         UPDATE `{self.table_ids['entries']}`
         SET security_status = @security_status,
-            security_display = @security_display,
-            security_updated_at = @updated_at
+            security_display = @security_display
         WHERE id = @entry_id
         """
         
@@ -756,8 +755,7 @@ class BigQueryService:
                 query_parameters=[
                     bigquery.ScalarQueryParameter("entry_id", "STRING", entry_id),
                     bigquery.ScalarQueryParameter("security_status", "STRING", security_status),
-                    bigquery.ScalarQueryParameter("security_display", "STRING", security_display),
-                    bigquery.ScalarQueryParameter("updated_at", "TIMESTAMP", datetime.utcnow())
+                    bigquery.ScalarQueryParameter("security_display", "STRING", security_display)
                 ]
             )
             

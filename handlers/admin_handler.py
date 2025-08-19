@@ -581,8 +581,9 @@ tags: tag1, tag2, tag3 (optional)
                 })
                 return
             
-            # Security guidelines URL (you may want to make this configurable in settings)
-            guidelines_url = "https://your-company.com/security-guidelines"  # Replace with actual URL
+            # Security guidelines URL from settings
+            from config.settings import settings
+            guidelines_url = settings.SECURITY_GUIDELINES_URL
             
             # Process each entry
             successful_updates = 0
