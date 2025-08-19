@@ -59,12 +59,31 @@ class AIService:
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     temperature=0.7,
-                    max_output_tokens=2000,  # Increased for gemini-2.5 thought tokens
+                    max_output_tokens=4000,  # Increased for gemini-2.5 thought tokens
                 )
             )
             
             logger.debug(f"AI response received: {response}")
             logger.debug(f"AI response text: {response.text}")
+            
+            # Check for token limit issues
+            if hasattr(response, 'candidates') and response.candidates:
+                candidate = response.candidates[0]
+                if hasattr(candidate, 'finish_reason') and candidate.finish_reason:
+                    finish_reason = str(candidate.finish_reason)
+                    if 'MAX_TOKENS' in finish_reason:
+                        logger.warning("AI response hit token limit, trying with shorter prompt")
+                        # Retry with a much shorter prompt
+                        short_prompt = f"Summarize this AI tool in 50 words: {title}. {content[:500]}"
+                        response = await self.client.aio.models.generate_content(
+                            model=settings.GEMINI_MODEL,
+                            contents=short_prompt,
+                            config=types.GenerateContentConfig(
+                                temperature=0.7,
+                                max_output_tokens=1000,
+                            )
+                        )
+                        logger.debug(f"Retry response text: {response.text}")
             
             result = self._parse_ai_response(response.text or "")
             logger.debug(f"Parsed result: {result}")

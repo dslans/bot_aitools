@@ -34,6 +34,9 @@ class Settings:
     # Admin Settings - Comma-separated list of Slack user IDs
     ADMIN_USER_IDS = os.getenv('ADMIN_USER_IDS', '').split(',') if os.getenv('ADMIN_USER_IDS') else []
     
+    # Security Settings
+    SECURITY_GUIDELINES_URL = os.getenv('SECURITY_GUIDELINES_URL', '')
+    
     @classmethod
     def validate(cls):
         """Validate required settings."""

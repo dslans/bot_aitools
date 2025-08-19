@@ -82,6 +82,8 @@ def setup_core_tables(client, project_id, dataset_id):
         bigquery.SchemaField("target_audience", "STRING", mode="NULLABLE"),  # Included from start
         bigquery.SchemaField("tags", "STRING", mode="REPEATED"),
         bigquery.SchemaField("author_id", "STRING", mode="REQUIRED"),
+        bigquery.SchemaField("security_status", "STRING", mode="NULLABLE"),  # Security approval status
+        bigquery.SchemaField("security_display", "STRING", mode="NULLABLE"),  # Short security message
         bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
     ]
     

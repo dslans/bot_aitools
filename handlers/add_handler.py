@@ -10,6 +10,7 @@ from slack_bolt import App
 from services.ai_service import ai_service
 from services.bigquery_service import bigquery_service
 from services.scraper_service import scraper_service
+from services.security_service import security_service
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +138,26 @@ def process_add_entry(title: str, content: str, user_id: str) -> Optional[str]:
         logger.warning(f"AI service failed for '{title}': {e}")
         logger.info("Entry will be created without AI-generated content (can be added later by admin)")
     
+    # Generate security evaluation
+    security_status = None
+    security_display = None
+    
+    try:
+        # Evaluate tool security using the AI summary and description
+        from config.settings import settings
+        security_status, security_display = security_service.evaluate_tool_security_sync(
+            title=title,
+            url=url,
+            description=description,
+            ai_summary=ai_summary,
+            tags=tags or [],
+            guidelines_url=settings.SECURITY_GUIDELINES_URL
+        )
+        logger.info(f"Security evaluation completed for {title}: {security_status}")
+    except Exception as e:
+        logger.warning(f"Security service failed for '{title}': {e}")
+        logger.info("Entry will be created without security evaluation (can be added later by admin)")
+    
     # Create the entry
     try:
         entry_id = bigquery_service.create_entry(
@@ -146,7 +167,9 @@ def process_add_entry(title: str, content: str, user_id: str) -> Optional[str]:
             ai_summary=ai_summary,
             target_audience=target_audience,
             tags=tags,
-            author_id=user_id
+            author_id=user_id,
+            security_status=security_status,
+            security_display=security_display
         )
         return entry_id
     except Exception as e:
@@ -188,6 +211,12 @@ def format_entry_response(entry: dict) -> dict:
         response_parts.append(f"🏷️ Tags: {tags_str}")
     else:
         response_parts.append("🏷️ _Tags will be added by admins_")
+    
+    # Add security information if present
+    if entry.get('security_display'):
+        response_parts.append(f"🔒 Security: {entry['security_display']}")
+    else:
+        response_parts.append("🔒 _Security evaluation pending_")
     
     # Add note about missing AI content if applicable
     if not entry['ai_summary'] or not entry['tags']:

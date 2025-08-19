@@ -12,6 +12,7 @@ from config.settings import settings
 from services.bigquery_service import bigquery_service
 from services.ai_service import ai_service
 from services.tag_suggestions_service import tag_suggestions_service
+from services.security_service import security_service
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,7 @@ def register_admin_handler(app: App):
 • `/aitools-admin-delete <entry_id>` - Delete an entry permanently
 • `/aitools-admin-search <keyword>` - Search entries for editing
 • `/aitools-admin-tags` - Manage community tag suggestions
+• `/aitools-admin-security-refresh` - Refresh security status for all tools
 
 *Entry Editing Format:*
 Use `/aitools-admin-edit <entry_id>` then follow with:
@@ -319,14 +321,17 @@ tags: tag1, tag2, tag3 (optional)
                 
                 result_text = f"✅ Successfully regenerated AI content for *{entry['title']}*\n\n"
                 
-                if updated_entry.get('ai_summary'):
-                    result_text += f"*New Summary:* {updated_entry['ai_summary'][:200]}...\n\n"
-                
-                if updated_entry.get('target_audience'): 
-                    result_text += f"*New Target Audience:* {updated_entry['target_audience']}\n\n"
-                
-                if updated_entry.get('tags'):
-                    result_text += f"*New Tags:* {', '.join(updated_entry['tags'])}"
+                if updated_entry is not None:
+                    if updated_entry.get('ai_summary'):
+                        result_text += f"*New Summary:* {updated_entry['ai_summary'][:200]}...\n\n"
+                    
+                    if updated_entry.get('target_audience'): 
+                        result_text += f"*New Target Audience:* {updated_entry['target_audience']}\n\n"
+                    
+                    if updated_entry.get('tags'):
+                        result_text += f"*New Tags:* {', '.join(updated_entry['tags'])}"
+                else:
+                    result_text += "_Warning: Could not retrieve updated entry details._"
                 
                 respond({
                     "text": result_text,
@@ -547,6 +552,118 @@ tags: tag1, tag2, tag3 (optional)
             logger.error(f"Error in admin tags: {e}")
             respond({
                 "text": f"❌ Error managing tags: {str(e)}",
+                "response_type": "ephemeral"
+            })
+    
+    @app.command("/aitools-admin-security-refresh")
+    def admin_security_refresh(ack, respond, command):
+        """Refresh security status for all tools."""
+        ack()
+        
+        if not check_admin_permission(command.get('user_id')):
+            send_permission_error(respond)
+            return
+        
+        try:
+            # Send initial confirmation
+            respond({
+                "text": "🔐 *Starting security refresh for all tools...*\n\nThis may take a few minutes. I'll update you with the results.",
+                "response_type": "ephemeral"
+            })
+            
+            # Get all entries that need security evaluation
+            entries = bigquery_service.get_all_entries_for_security_refresh()
+            
+            if not entries:
+                respond({
+                    "text": "📋 No entries found to evaluate.",
+                    "response_type": "ephemeral"
+                })
+                return
+            
+            # Security guidelines URL (you may want to make this configurable in settings)
+            guidelines_url = "https://your-company.com/security-guidelines"  # Replace with actual URL
+            
+            # Process each entry
+            successful_updates = 0
+            failed_updates = 0
+            evaluation_results = []
+            
+            logger.info(f"Starting security evaluation for {len(entries)} entries")
+            
+            for i, entry in enumerate(entries, 1):
+                try:
+                    logger.info(f"Evaluating security for entry {i}/{len(entries)}: {entry['title']}")
+                    
+                    # Evaluate security status using AI
+                    status, display_text = security_service.evaluate_tool_security_sync(
+                        title=entry['title'],
+                        url=entry.get('url'),
+                        description=entry.get('description'),
+                        ai_summary=entry.get('ai_summary'),
+                        tags=entry.get('tags', []),
+                        guidelines_url=guidelines_url
+                    )
+                    
+                    # Update the entry with security status
+                    success = bigquery_service.update_entry_security(
+                        entry_id=entry['id'],
+                        security_status=status,
+                        security_display=display_text
+                    )
+                    
+                    if success:
+                        successful_updates += 1
+                        evaluation_results.append({
+                            'title': entry['title'][:30] + ('...' if len(entry['title']) > 30 else ''),
+                            'status': status,
+                            'display': display_text
+                        })
+                        logger.info(f"Updated security for {entry['title']}: {status}")
+                    else:
+                        failed_updates += 1
+                        logger.error(f"Failed to update security for {entry['title']}")
+                        
+                except Exception as entry_error:
+                    failed_updates += 1
+                    logger.error(f"Error evaluating security for {entry['title']}: {entry_error}")
+                    continue
+            
+            # Prepare final report
+            report_text = f"🔐 *Security Refresh Complete!*\n\n"
+            report_text += f"✅ *Successfully Updated:* {successful_updates}\n"
+            report_text += f"❌ *Failed:* {failed_updates}\n"
+            report_text += f"📊 *Total Processed:* {len(entries)}\n\n"
+            
+            # Show sample of results (first 10)
+            if evaluation_results:
+                report_text += "*Sample Results:*\n"
+                for result in evaluation_results[:10]:
+                    status_emoji = {
+                        'approved': '✅',
+                        'restricted': '⚠️', 
+                        'prohibited': '🚫',
+                        'review': '🔍'
+                    }.get(result['status'], '❓')
+                    report_text += f"• {status_emoji} {result['title']} - {result['display'][:40]}...\n"
+                
+                if len(evaluation_results) > 10:
+                    report_text += f"\n*(and {len(evaluation_results) - 10} more...)*"
+            
+            report_text += "\n\n💡 *Use `/aitools-list` to see updated security indicators*"
+            
+            respond({
+                "text": report_text,
+                "response_type": "ephemeral"
+            })
+            
+            logger.info(f"Security refresh completed: {successful_updates} successful, {failed_updates} failed")
+            
+        except Exception as e:
+            logger.error(f"Error in security refresh: {e}")
+            respond({
+                "text": f"❌ *Security refresh failed:* {str(e)}\n\n" +
+                       "Please check the logs for details.",
                 "response_type": "ephemeral"
             })
     

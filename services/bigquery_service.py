@@ -36,7 +36,9 @@ class BigQueryService:
         return self.client.get_table(table_id)
     
     def create_entry(self, title: str, url: Optional[str], description: Optional[str], 
-                    ai_summary: Optional[str], target_audience: Optional[str], tags: List[str], author_id: str) -> str:
+                    ai_summary: Optional[str], target_audience: Optional[str], tags: List[str], 
+                    author_id: str, security_status: Optional[str] = None, 
+                    security_display: Optional[str] = None) -> str:
         """
         Create a new entry in the database.
         
@@ -63,6 +65,8 @@ class BigQueryService:
             'target_audience': target_audience,
             'tags': tags,
             'author_id': author_id,
+            'security_status': security_status,
+            'security_display': security_display,
             'created_at': datetime.utcnow().isoformat()
         }
         
@@ -79,17 +83,30 @@ class BigQueryService:
             
             if errors:
                 logger.error(f"Error inserting entry: {errors}")
-                # Try to handle the specific case of missing target_audience field
+                
+                # Try to handle missing field errors by progressively removing problematic fields
+                problematic_fields = []
+                
+                # Check for target_audience field errors
                 if any('target_audience' in str(error) for error in errors):
-                    logger.warning("target_audience field error detected, trying without it...")
-                    # Remove target_audience and retry
-                    fallback_row = {k: v for k, v in row.items() if k != 'target_audience'}
+                    problematic_fields.append('target_audience')
+                    logger.warning("target_audience field error detected")
+                
+                # Check for security field errors
+                if any('security_status' in str(error) or 'security_display' in str(error) for error in errors):
+                    problematic_fields.extend(['security_status', 'security_display'])
+                    logger.warning("security fields error detected")
+                
+                if problematic_fields:
+                    logger.warning(f"Trying insert without problematic fields: {problematic_fields}")
+                    # Remove problematic fields and retry
+                    fallback_row = {k: v for k, v in row.items() if k not in problematic_fields}
                     fallback_errors = self.client.insert_rows_json(table, [fallback_row])
                     if fallback_errors:
                         logger.error(f"Fallback insert also failed: {fallback_errors}")
                         raise Exception(f"Failed to insert entry: {fallback_errors}")
                     else:
-                        logger.info(f"Created entry {entry_id} without target_audience field")
+                        logger.info(f"Created entry {entry_id} without fields: {problematic_fields}")
                         return entry_id
                 else:
                     raise Exception(f"Failed to insert entry: {errors}")
@@ -162,13 +179,14 @@ class BigQueryService:
         query = f"""
         SELECT 
             e.id, e.title, e.url, e.description, e.ai_summary, e.target_audience, e.tags, e.author_id, e.created_at,
+            e.security_status, e.security_display,
             COALESCE(SUM(v.vote), 0) AS score,
             COUNT(CASE WHEN v.vote = 1 THEN 1 END) AS upvotes,
             COUNT(CASE WHEN v.vote = -1 THEN 1 END) AS downvotes
         FROM `{self.table_ids['entries']}` e
         LEFT JOIN `{self.table_ids['votes']}` v ON e.id = v.entry_id
         WHERE e.id = @entry_id
-        GROUP BY e.id, e.title, e.url, e.description, e.ai_summary, e.target_audience, e.tags, e.author_id, e.created_at
+        GROUP BY e.id, e.title, e.url, e.description, e.ai_summary, e.target_audience, e.tags, e.author_id, e.created_at, e.security_status, e.security_display
         """
         
         try:
@@ -192,6 +210,8 @@ class BigQueryService:
                     'tags': list(row.tags) if row.tags else [],
                     'author_id': row.author_id,
                     'created_at': row.created_at,
+                    'security_status': getattr(row, 'security_status', None),
+                    'security_display': getattr(row, 'security_display', None),
                     'score': int(row.score),
                     'upvotes': int(row.upvotes),
                     'downvotes': int(row.downvotes)
@@ -709,6 +729,89 @@ class BigQueryService:
             
         except Exception as e:
             logger.error(f"Error getting top entries: {e}")
+            return []
+    
+    def update_entry_security(self, entry_id: str, security_status: str, security_display: str) -> bool:
+        """
+        Update the security status of an entry.
+        
+        Args:
+            entry_id: Entry ID
+            security_status: Security status ('approved', 'restricted', 'prohibited', 'review')
+            security_display: User-friendly display text
+            
+        Returns:
+            True if successful
+        """
+        query = f"""
+        UPDATE `{self.table_ids['entries']}`
+        SET security_status = @security_status,
+            security_display = @security_display,
+            security_updated_at = @updated_at
+        WHERE id = @entry_id
+        """
+        
+        try:
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("entry_id", "STRING", entry_id),
+                    bigquery.ScalarQueryParameter("security_status", "STRING", security_status),
+                    bigquery.ScalarQueryParameter("security_display", "STRING", security_display),
+                    bigquery.ScalarQueryParameter("updated_at", "TIMESTAMP", datetime.utcnow())
+                ]
+            )
+            
+            query_job = self.client.query(query, job_config=job_config)
+            result = query_job.result()
+            
+            if result.num_dml_affected_rows > 0:
+                logger.info(f"Updated security status for entry {entry_id}: {security_status}")
+                return True
+            else:
+                logger.warning(f"No entry found with ID {entry_id} for security update")
+                return False
+                
+        except Exception as e:
+            # If security fields don't exist, log warning but don't fail
+            if "security_status" in str(e) or "security_display" in str(e):
+                logger.warning(f"Security fields not available in database schema: {e}")
+                return False
+            logger.error(f"Error updating entry security: {e}")
+            return False
+    
+    def get_all_entries_for_security_refresh(self) -> List[Dict[str, Any]]:
+        """
+        Get all entries for security status refresh.
+        
+        Returns:
+            List of entries with basic info needed for security evaluation
+        """
+        query = f"""
+        SELECT id, title, url, description, ai_summary, tags
+        FROM `{self.table_ids['entries']}`
+        ORDER BY created_at DESC
+        """
+        
+        try:
+            query_job = self.client.query(query)
+            results = query_job.result()
+            
+            entries = []
+            for row in results:
+                entries.append({
+                    'id': row.id,
+                    'title': row.title,
+                    'url': getattr(row, 'url', None),
+                    'description': getattr(row, 'description', None),
+                    'ai_summary': getattr(row, 'ai_summary', None),
+                    'tags': list(row.tags) if row.tags else []
+                })
+            
+            logger.info(f"Retrieved {len(entries)} entries for security refresh")
+            return entries
+            
+        except Exception as e:
+            logger.error(f"Error getting entries for security refresh: {e}")
             return []
     
     def get_all_tags(self) -> List[str]:
