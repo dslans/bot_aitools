@@ -11,6 +11,7 @@ from slack_bolt import App
 from config.settings import settings
 from services.bigquery_service import bigquery_service
 from services.ai_service import ai_service
+from services.tag_suggestions_service import tag_suggestions_service
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,11 @@ def register_admin_handler(app: App):
     
     def check_admin_permission(user_id: str) -> bool:
         """Check if user has admin permissions."""
-        return settings.is_admin(user_id)
+        logger.info(f"Checking admin permission for user_id: {user_id}")
+        logger.info(f"Configured admin user IDs: {settings.ADMIN_USER_IDS}")
+        is_admin = settings.is_admin(user_id)
+        logger.info(f"Is admin: {is_admin}")
+        return is_admin
     
     def send_permission_error(respond):
         """Send permission denied message."""
@@ -46,6 +51,7 @@ def register_admin_handler(app: App):
 • `/aitools-admin-retag <entry_id>` - Regenerate AI tags and summary
 • `/aitools-admin-delete <entry_id>` - Delete an entry permanently
 • `/aitools-admin-search <keyword>` - Search entries for editing
+• `/aitools-admin-tags` - Manage community tag suggestions
 
 *Entry Editing Format:*
 Use `/aitools-admin-edit <entry_id>` then follow with:
@@ -86,7 +92,19 @@ tags: tag1, tag2, tag3 (optional)
             if text.isdigit():
                 limit = min(int(text), 50)  # Max 50 entries
             
+            logger.info(f"Admin list called with limit: {limit}")
+            
             entries = bigquery_service.list_all_entries_for_admin(limit=limit)
+            
+            logger.info(f"BigQuery returned: {type(entries)} with value: {entries}")
+            
+            # Handle case where query returns None instead of empty list
+            if entries is None:
+                logger.warning("BigQuery returned None, converting to empty list")
+                entries = []
+            elif not isinstance(entries, list):
+                logger.error(f"BigQuery returned unexpected type: {type(entries)}")
+                entries = []
             
             if not entries:
                 respond({
@@ -107,26 +125,47 @@ tags: tag1, tag2, tag3 (optional)
             entry_blocks.append({"type": "divider"})
             
             for entry in entries:
-                # Truncate long titles and summaries
-                title = entry['title'][:50] + "..." if len(entry['title']) > 50 else entry['title']
-                summary = entry.get('ai_summary') or 'No AI summary'
-                if len(summary) > 100:
-                    summary = summary[:100] + "..."
+                # Safely handle entry fields that might be None
+                entry_title = entry.get('title') or 'No title'
+                title = entry_title[:50] + "..." if len(entry_title) > 50 else entry_title
                 
-                tags_text = ", ".join(entry.get('tags', [])[:3]) if entry.get('tags') else 'No tags'
-                if len(entry.get('tags', [])) > 3:
-                    tags_text += f" (+{len(entry['tags']) - 3} more)"
+                entry_summary = entry.get('ai_summary') or 'No AI summary'
+                summary = entry_summary[:100] + "..." if len(entry_summary) > 100 else entry_summary
                 
-                audience = entry.get('target_audience', 'No target audience')
-                if len(audience) > 50:
-                    audience = audience[:50] + "..."
+                entry_tags = entry.get('tags') or []
+                tags_text = ", ".join(entry_tags[:3]) if entry_tags else 'No tags'
+                if len(entry_tags) > 3:
+                    tags_text += f" (+{len(entry_tags) - 3} more)"
+                
+                entry_audience = entry.get('target_audience') or 'No target audience'
+                audience = entry_audience[:50] + "..." if len(entry_audience) > 50 else entry_audience
+                
+                # Safely handle other fields
+                entry_id = entry.get('id') or 'unknown'
+                entry_id_short = entry_id[:8] + "..." if len(entry_id) > 8 else entry_id
+                
+                score = entry.get('score', 0)
+                upvotes = entry.get('upvotes', 0)
+                downvotes = entry.get('downvotes', 0)
+                
+                author_id = entry.get('author_id') or 'unknown'
+                
+                # Handle date formatting safely
+                created_at = entry.get('created_at')
+                if created_at:
+                    try:
+                        date_str = created_at.strftime('%Y-%m-%d')
+                    except:
+                        date_str = str(created_at)[:10]
+                else:
+                    date_str = 'unknown'
                 
                 entry_text = f"""**{title}**
-*ID:* `{entry['id'][:8]}...` | *Score:* {entry['score']:+d} ({entry['upvotes']}👍 {entry['downvotes']}👎)
+*ID:* `{entry_id_short}` | *Score:* {score:+d} ({upvotes}👍 {downvotes}👎)
 *Summary:* {summary}
 *Audience:* {audience}  
 *Tags:* {tags_text}
-*Author:* <@{entry['author_id']}> | *Created:* {entry['created_at'].strftime('%Y-%m-%d')}"""
+*Author:* <@{author_id}> | *Created:* {date_str}"""
                 
                 entry_blocks.append({
                     "type": "section",
@@ -427,6 +466,26 @@ tags: tag1, tag2, tag3 (optional)
                     "response_type": "ephemeral"
                 })
             else:
+                # Check if it was a streaming buffer issue (for recently added entries)
+                import time
+                from datetime import datetime, timezone
+                
+                created_at = entry.get('created_at')
+                if created_at:
+                    # Calculate minutes since creation
+                    now = datetime.now(timezone.utc)
+                    minutes_old = (now - created_at).total_seconds() / 60
+                    
+                    if minutes_old < 90:  # Likely streaming buffer issue
+                        respond({
+                            "text": f"❌ Cannot delete entry `{entry_id}` yet.\n\n" +
+                                   f"**Reason:** BigQuery streaming buffer limitation\n" +
+                                   f"**Solution:** Wait {90 - int(minutes_old)} more minutes, then try again\n\n" +
+                                   f"*This happens with recently added entries (< 90 minutes old)*",
+                            "response_type": "ephemeral"
+                        })
+                        return
+                
                 respond({
                     "text": f"❌ Failed to delete entry `{entry_id}`. Please check the logs.",
                     "response_type": "ephemeral"
@@ -436,6 +495,58 @@ tags: tag1, tag2, tag3 (optional)
             logger.error(f"Error in admin delete: {e}")
             respond({
                 "text": f"❌ Error deleting entry: {str(e)}",
+                "response_type": "ephemeral"
+            })
+    
+    @app.command("/aitools-admin-tags")
+    def admin_tags(ack, respond, command):
+        """Manage community tag suggestions."""
+        ack()
+        
+        if not check_admin_permission(command.get('user_id')):
+            send_permission_error(respond)
+            return
+        
+        try:
+            text = command.get('text', '').strip()
+            
+            if not text:
+                # Show pending suggestions by default
+                show_pending_tag_suggestions(respond)
+                return
+            
+            # Parse command: approve <suggestion_id> | reject <suggestion_id> | promote <tag>
+            parts = text.split(' ', 1)
+            if len(parts) != 2:
+                respond({
+                    "text": "❌ Invalid format. Usage:\n" +
+                           "• `/aitools-admin-tags` - Show pending suggestions\n" +
+                           "• `/aitools-admin-tags approve <suggestion_id>`\n" +
+                           "• `/aitools-admin-tags reject <suggestion_id>`\n" +
+                           "• `/aitools-admin-tags promote <tag_name>`",
+                    "response_type": "ephemeral"
+                })
+                return
+            
+            action, target = parts[0].lower().strip(), parts[1].strip()
+            user_id = command.get('user_id')
+            
+            if action == 'approve':
+                handle_admin_approve_tag(respond, target, user_id)
+            elif action == 'reject':
+                handle_admin_reject_tag(respond, target, user_id)
+            elif action == 'promote':
+                handle_admin_promote_tag(respond, target, user_id)
+            else:
+                respond({
+                    "text": f"❌ Unknown action: {action}. Use: approve, reject, or promote",
+                    "response_type": "ephemeral"
+                })
+                
+        except Exception as e:
+            logger.error(f"Error in admin tags: {e}")
+            respond({
+                "text": f"❌ Error managing tags: {str(e)}",
                 "response_type": "ephemeral"
             })
     
@@ -469,6 +580,33 @@ tags: tag1, tag2, tag3 (optional)
             
         except Exception as e:
             logger.error(f"Error handling admin edit button: {e}")
+            respond({
+                "text": f"❌ Error: {str(e)}",
+                "response_type": "ephemeral"
+            })
+    
+    # Handle admin approve tag buttons
+    @app.action(re.compile(r"admin_approve_tag_.+"))
+    def handle_admin_approve_button(ack, body, respond):
+        """Handle admin approve tag buttons."""
+        ack()
+        
+        user_id = body.get('user', {}).get('id')
+        if not check_admin_permission(user_id):
+            respond({
+                "text": "❌ Access denied.",
+                "response_type": "ephemeral"
+            })
+            return
+        
+        try:
+            action = body.get('actions', [{}])[0]
+            suggestion_id = action.get('value')
+            
+            handle_admin_approve_tag(respond, suggestion_id, user_id)
+            
+        except Exception as e:
+            logger.error(f"Error handling admin approve tag button: {e}")
             respond({
                 "text": f"❌ Error: {str(e)}",
                 "response_type": "ephemeral"
@@ -540,5 +678,132 @@ def parse_edit_instructions(lines: List[str]) -> Dict:
             updates['tags'] = tag_list
     
     return updates
+
+def show_pending_tag_suggestions(respond):
+    """Show pending tag suggestions for admin review."""
+    suggestions = tag_suggestions_service.get_pending_suggestions(limit=10)
+    
+    if not suggestions:
+        respond({
+            "text": "🏷️ *No Pending Tag Suggestions*\n\nAll community tag suggestions have been reviewed!",
+            "response_type": "ephemeral"
+        })
+        return
+    
+    blocks = [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"🏷️ *Pending Tag Suggestions* ({len(suggestions)} items)"
+            }
+        },
+        {"type": "divider"}
+    ]
+    
+    for suggestion in suggestions:
+        net_votes = suggestion['net_votes']
+        status_emoji = "🔥" if net_votes >= 2 else "⏳" if net_votes >= 0 else "❄️"
+        
+        suggestion_text = f"**{suggestion['entry_title']}** {status_emoji}\n" +\
+                         f"*Suggested Tag:* `{suggestion['suggested_tag']}`\n" +\
+                         f"*Votes:* {suggestion['upvotes']}👍 {suggestion['downvotes']}👎 (net: {net_votes:+d})\n" +\
+                         f"*Suggested by:* <@{suggestion['suggested_by']}>\n" +\
+                         f"*ID:* `{suggestion['id'][:8]}...`"
+        
+        blocks.append({
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": suggestion_text
+            },
+            "accessory": {
+                "type": "button",
+                "text": {
+                    "type": "plain_text",
+                    "text": "✅ Approve"
+                },
+                "style": "primary",
+                "action_id": f"admin_approve_tag_{suggestion['id']}",
+                "value": suggestion['id']
+            }
+        })
+        blocks.append({"type": "divider"})
+    
+    blocks.append({
+        "type": "context",
+        "elements": [{
+            "type": "mrkdwn",
+            "text": "💡 Use `/aitools-admin-tags approve <id>` or `/aitools-admin-tags reject <id>` to manage suggestions"
+        }]
+    })
+    
+    respond({
+        "blocks": blocks,
+        "response_type": "ephemeral"
+    })
+
+def handle_admin_approve_tag(respond, suggestion_id, admin_user_id):
+    """Handle admin approval of a tag suggestion."""
+    suggestion = tag_suggestions_service.get_suggestion_by_id(suggestion_id)
+    
+    if not suggestion:
+        respond({
+            "text": f"❌ Tag suggestion `{suggestion_id}` not found.",
+            "response_type": "ephemeral"
+        })
+        return
+    
+    if suggestion['status'] != 'pending':
+        respond({
+            "text": f"ℹ️ Tag suggestion `{suggestion['suggested_tag']}` is already {suggestion['status']}.",
+            "response_type": "ephemeral"
+        })
+        return
+    
+    # Promote tag and mark suggestion as approved
+    success = tag_suggestions_service.promote_tag_to_approved(suggestion['suggested_tag'], admin_user_id)
+    
+    if success:
+        respond({
+            "text": f"✅ **Tag Approved!**\n\n" +
+                   f"Tag `{suggestion['suggested_tag']}` has been approved and is now available for community use.\n\n" +
+                   f"*Tool:* {suggestion.get('entry_title', 'Unknown')}\n" +
+                   f"*Votes:* {suggestion['upvotes']}👍 {suggestion['downvotes']}👎",
+            "response_type": "ephemeral"
+        })
+    else:
+        respond({
+            "text": f"❌ Failed to approve tag `{suggestion['suggested_tag']}`. Please try again.",
+            "response_type": "ephemeral"
+        })
+
+def handle_admin_reject_tag(respond, suggestion_id, admin_user_id):
+    """Handle admin rejection of a tag suggestion."""
+    # For now, just mark as rejected in the suggestions table
+    # TODO: Implement rejection logic in tag_suggestions_service
+    respond({
+        "text": f"⚠️ Tag rejection feature is not yet implemented.\n\n" +
+               f"For now, you can simply ignore unwanted suggestions.\n" +
+               f"They won't be auto-promoted without enough votes.",
+        "response_type": "ephemeral"
+    })
+
+def handle_admin_promote_tag(respond, tag_name, admin_user_id):
+    """Handle admin manual promotion of a tag."""
+    success = tag_suggestions_service.promote_tag_to_approved(tag_name, admin_user_id)
+    
+    if success:
+        respond({
+            "text": f"✅ **Tag Promoted!**\n\n" +
+                   f"Tag `{tag_name}` has been manually promoted to approved status.\n\n" +
+                   f"It is now available for community use.",
+            "response_type": "ephemeral"
+        })
+    else:
+        respond({
+            "text": f"❌ Failed to promote tag `{tag_name}`. It may already be approved.",
+            "response_type": "ephemeral"
+        })
 
 logger.info("✅ Admin handlers registered successfully")

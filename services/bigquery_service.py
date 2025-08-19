@@ -415,7 +415,7 @@ class BigQueryService:
             
         if tags is not None:
             update_clauses.append("tags = @tags")
-            query_params.append(bigquery.ScalarQueryParameter("tags", "STRING", tags, mode="REPEATED"))
+            query_params.append(bigquery.ArrayQueryParameter("tags", "STRING", tags))
         
         if not update_clauses:
             logger.warning("No fields to update")
@@ -510,6 +510,7 @@ class BigQueryService:
         """
         
         try:
+            logger.info(f"Executing admin list query with limit: {limit}")
             job_config = bigquery.QueryJobConfig(
                 query_parameters=[
                     bigquery.ScalarQueryParameter("limit", "INT64", limit)
@@ -520,26 +521,38 @@ class BigQueryService:
             results = query_job.result()
             
             entries = []
+            row_count = 0
             for row in results:
-                entries.append({
-                    'id': row.id,
-                    'title': row.title,
-                    'url': row.url,
-                    'description': row.description,
-                    'ai_summary': row.ai_summary,
-                    'target_audience': getattr(row, 'target_audience', None),  # Handle missing column gracefully
-                    'tags': list(row.tags) if row.tags else [],
-                    'author_id': row.author_id,
-                    'created_at': row.created_at,
-                    'score': int(row.score),
-                    'upvotes': int(row.upvotes),
-                    'downvotes': int(row.downvotes)
-                })
+                row_count += 1
+                try:
+                    # Safely handle each field
+                    entry_data = {
+                        'id': getattr(row, 'id', None),
+                        'title': getattr(row, 'title', None) or 'No title',
+                        'url': getattr(row, 'url', None),
+                        'description': getattr(row, 'description', None),
+                        'ai_summary': getattr(row, 'ai_summary', None),
+                        'target_audience': getattr(row, 'target_audience', None),
+                        'tags': list(getattr(row, 'tags', [])) if getattr(row, 'tags', None) else [],
+                        'author_id': getattr(row, 'author_id', None),
+                        'created_at': getattr(row, 'created_at', None),
+                        'score': int(getattr(row, 'score', 0)),
+                        'upvotes': int(getattr(row, 'upvotes', 0)),
+                        'downvotes': int(getattr(row, 'downvotes', 0))
+                    }
+                    entries.append(entry_data)
+                    logger.debug(f"Processed entry {row_count}: {entry_data['id']} - {entry_data['title']}")
+                except Exception as row_error:
+                    logger.error(f"Error processing row {row_count}: {row_error}")
+                    # Continue processing other rows
+                    continue
             
+            logger.info(f"Successfully retrieved {len(entries)} entries for admin")
             return entries
             
         except Exception as e:
             logger.error(f"Error listing entries for admin: {e}")
+            logger.error(f"Query was: {query}")
             return []
     
     def regenerate_ai_content(self, entry_id: str) -> bool:
@@ -625,8 +638,44 @@ class BigQueryService:
                 return False
                 
         except Exception as e:
-            logger.error(f"Error deleting entry: {e}")
-            return False
+            error_msg = str(e)
+            if "streaming buffer" in error_msg:
+                logger.warning(f"Cannot delete entry {entry_id}: BigQuery streaming buffer limitation. Try again in 90 minutes.")
+                # Could add retry logic here if needed
+                return False
+            else:
+                logger.error(f"Error deleting entry: {e}")
+                return False
+    
+    def get_all_tags(self) -> List[str]:
+        """
+        Get all unique tags from all entries, sorted by frequency.
+        
+        Returns:
+            List of tags sorted by most frequently used
+        """
+        query = f"""
+        SELECT tag, COUNT(*) as frequency
+        FROM `{self.table_ids['entries']}`,
+        UNNEST(tags) as tag
+        WHERE tag IS NOT NULL AND tag != ''
+        GROUP BY tag
+        ORDER BY frequency DESC, tag ASC
+        """
+        
+        try:
+            query_job = self.client.query(query)
+            results = query_job.result()
+            
+            tags = []
+            for row in results:
+                tags.append(row.tag)
+            
+            return tags
+            
+        except Exception as e:
+            logger.error(f"Error getting all tags: {e}")
+            return []
 
 # Global BigQuery service instance
 bigquery_service = BigQueryService()

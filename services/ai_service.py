@@ -9,6 +9,7 @@ from google import genai
 from google.genai import types
 
 from config.settings import settings
+from config.tags import validate_tags, build_ai_prompt_tags_section
 
 logger = logging.getLogger(__name__)
 
@@ -76,15 +77,19 @@ class AIService:
     
     def _build_prompt(self, title: str, content: str) -> str:
         """Build the prompt for AI generation."""
+        tags_section = build_ai_prompt_tags_section()
+        
         return f"""Analyze this AI tool:
 
 Tool: {title}
 Content: {content[:1500]}
 
+{tags_section}
+
 Provide:
-1. SUMMARY: Concise description (50 words max)
-2. AUDIENCE: Target users 
-3. TAGS: Up to 5 lowercase tags (ai-assistant, code-generation, python, cli, etc.)
+1. SUMMARY: Concise description (40-60 words)
+2. AUDIENCE: Target users (brief description)
+3. TAGS: Select 2-4 most relevant tags from the list above
 
 Format exactly as:
 SUMMARY: [description]
@@ -123,7 +128,10 @@ TAGS: [tag1, tag2, tag3]"""
             if words:
                 summary = ' '.join(words[:100])
         
-        return summary, audience, tags[:5]  # Limit to 5 tags max
+        # Validate and clean tags
+        validated_tags = validate_tags(tags)
+        
+        return summary, audience, validated_tags
     
     def generate_summary_and_tags_sync(self, title: str, content: str) -> Tuple[Optional[str], Optional[str], List[str]]:
         """Synchronous wrapper for generate_summary_and_tags."""
