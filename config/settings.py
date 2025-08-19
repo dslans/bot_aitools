@@ -31,6 +31,9 @@ class Settings:
     MAX_SEARCH_RESULTS = int(os.getenv('MAX_SEARCH_RESULTS', '5'))
     MAX_LIST_RESULTS = int(os.getenv('MAX_LIST_RESULTS', '10'))
     
+    # Admin Settings - Comma-separated list of Slack user IDs
+    ADMIN_USER_IDS = os.getenv('ADMIN_USER_IDS', '').split(',') if os.getenv('ADMIN_USER_IDS') else []
+    
     @classmethod
     def validate(cls):
         """Validate required settings."""
@@ -49,6 +52,11 @@ class Settings:
             raise ValueError(
                 f"Missing required environment variables: {', '.join(missing_settings)}"
             )
+    
+    @classmethod
+    def is_admin(cls, user_id: str) -> bool:
+        """Check if a user is an admin."""
+        return user_id in cls.ADMIN_USER_IDS
     
     @classmethod
     def get_bigquery_table_ids(cls):

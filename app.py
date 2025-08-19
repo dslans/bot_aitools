@@ -6,6 +6,7 @@ AI Tools Wiki Slack Bot - Main Application
 import sys
 import os
 import logging
+from typing import List, Dict
 
 # Check Python version early
 if sys.version_info < (3, 9):
@@ -20,6 +21,7 @@ from config.settings import settings
 from handlers.add_handler import register_add_handler
 from handlers.search_handler import register_search_handler  
 from handlers.list_handler import register_list_handler
+from handlers.admin_handler import register_admin_handler
 
 # Configure logging
 logging.basicConfig(
@@ -122,11 +124,12 @@ def create_app():
     register_add_handler(app)
     register_search_handler(app)
     register_list_handler(app)
+    register_admin_handler(app)
     
     # Register global voting handlers for buttons
     register_global_voting_handlers(app)
     
-    # Add a simple health check command
+    # Help command (main /aitools command)
     @app.command("/aitools")
     def aitools_help(ack, say, command):
         """Handle the base /aitools command with help."""

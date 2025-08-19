@@ -125,12 +125,17 @@ def process_add_entry(title: str, content: str, user_id: str) -> Optional[str]:
         description = content
         content_for_ai = content
     
-    # Generate AI summary and tags
+    # Generate AI summary, target audience, and tags
+    ai_summary = None
+    target_audience = None
+    tags = []
+    
     try:
-        ai_summary, tags = ai_service.generate_summary_and_tags_sync(title, content_for_ai)
+        ai_summary, target_audience, tags = ai_service.generate_summary_and_tags_sync(title, content_for_ai)
+        logger.info(f"AI content generated successfully for {title}")
     except Exception as e:
-        logger.error(f"Error generating AI content: {e}")
-        ai_summary, tags = None, []
+        logger.warning(f"AI service failed for '{title}': {e}")
+        logger.info("Entry will be created without AI-generated content (can be added later by admin)")
     
     # Create the entry
     try:
@@ -139,6 +144,7 @@ def process_add_entry(title: str, content: str, user_id: str) -> Optional[str]:
             url=url,
             description=description,
             ai_summary=ai_summary,
+            target_audience=target_audience,
             tags=tags,
             author_id=user_id
         )
@@ -167,11 +173,25 @@ def format_entry_response(entry: dict) -> dict:
     # Add AI summary if present
     if entry['ai_summary']:
         response_parts.append(f"📝 {entry['ai_summary']}")
+    else:
+        response_parts.append("📝 _AI summary will be added by admins_")
+    
+    # Add target audience if present
+    if entry.get('target_audience'):
+        response_parts.append(f"👥 Best for: {entry['target_audience']}")
+    else:
+        response_parts.append("👥 _Target audience will be added by admins_")
     
     # Add tags if present
     if entry['tags']:
         tags_str = ', '.join(entry['tags'])
         response_parts.append(f"🏷️ Tags: {tags_str}")
+    else:
+        response_parts.append("🏷️ _Tags will be added by admins_")
+    
+    # Add note about missing AI content if applicable
+    if not entry['ai_summary'] or not entry['tags']:
+        response_parts.append("\n💡 _Missing details will be added by our admin team shortly._")
     
     # Add vote counts
     score = entry.get('score', 0)

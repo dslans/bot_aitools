@@ -30,10 +30,10 @@ def register_list_handler(app: App):
             if not entries:
                 if tag:
                     say(f"🏷️ No tools found with tag *{tag}*.\n"
-                        "Try a different tag or add more tools with `/aitools add`!")
+                        "Try a different tag or add more tools with `/aitools-add`!")
                 else:
                     say("📋 No tools found in the wiki yet.\n"
-                        "Be the first to add one with `/aitools add`!")
+                        "Be the first to add one with `/aitools-add`!")
                 return
             
             # Format the response
@@ -43,63 +43,6 @@ def register_list_handler(app: App):
         except Exception as e:
             logger.error(f"Error listing entries: {e}")
             say("❌ An error occurred while fetching the list. Please try again.")
-    
-    # Also register voting button handlers
-    register_voting_handlers(app)
-
-def register_voting_handlers(app: App):
-    """Register button handlers for voting."""
-    
-    @app.action("upvote_*")
-    def handle_upvote(ack, body, say):
-        """Handle upvote button clicks."""
-        ack()
-        handle_vote_action(body, say, 1)
-    
-    @app.action("downvote_*")
-    def handle_downvote(ack, body, say):
-        """Handle downvote button clicks."""
-        ack()
-        handle_vote_action(body, say, -1)
-
-def handle_vote_action(body: dict, say, vote_value: int):
-    """
-    Handle a vote action (upvote or downvote).
-    
-    Args:
-        body: Slack action body
-        say: Slack say function
-        vote_value: 1 for upvote, -1 for downvote
-    """
-    try:
-        # Extract information from the action
-        action = body.get('actions', [{}])[0]
-        entry_id = action.get('value')
-        user_id = body.get('user', {}).get('id')
-        
-        if not entry_id or not user_id:
-            logger.error("Missing entry_id or user_id in vote action")
-            return
-        
-        # Update the vote
-        success = bigquery_service.add_or_update_vote(entry_id, user_id, vote_value)
-        
-        if success:
-            # Get updated entry to show new score
-            entry = bigquery_service.get_entry_with_score(entry_id)
-            
-            if entry:
-                vote_text = "upvoted 👍" if vote_value == 1 else "downvoted 👎"
-                response_text = f"You {vote_text} *{entry['title']}*! New score: {entry['score']:+d}"
-                say(response_text, response_type="ephemeral")
-            else:
-                say("Vote recorded! ✅", response_type="ephemeral")
-        else:
-            say("❌ Failed to record your vote. Please try again.", response_type="ephemeral")
-            
-    except Exception as e:
-        logger.error(f"Error handling vote action: {e}")
-        say("❌ An error occurred while recording your vote.", response_type="ephemeral")
 
 def format_list_results(tag: Optional[str], entries: List[Dict[str, Any]]) -> dict:
     """
@@ -196,7 +139,7 @@ def format_list_results(tag: Optional[str], entries: List[Dict[str, Any]]) -> di
     # Add footer with help text
     footer_text = f"Showing {len(entries)} tool{'s' if len(entries) != 1 else ''}."
     if not tag:
-        footer_text += " Use `/aitools list <tag>` to filter by tag."
+        footer_text += " Use `/aitools-list <tag>` to filter by tag."
     
     blocks.append({
         "type": "context",
@@ -227,6 +170,7 @@ def format_list_entry(index: int, entry: Dict[str, Any]) -> str:
     title = entry.get('title', 'Untitled')
     score = entry.get('score', 0)
     ai_summary = entry.get('ai_summary')
+    target_audience = entry.get('target_audience')
     url = entry.get('url')
     tags = entry.get('tags', [])
     
@@ -243,6 +187,10 @@ def format_list_entry(index: int, entry: Dict[str, Any]) -> str:
         if len(summary) > 120:
             summary = summary[:117] + "..."
         result_parts.append(f"_{summary}_")
+    
+    # Add target audience if present
+    if target_audience:
+        result_parts.append(f"👥 Best for: {target_audience}")
     
     # Add tags
     if tags:

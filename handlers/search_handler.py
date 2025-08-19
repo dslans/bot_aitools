@@ -85,19 +85,50 @@ def format_search_results(keyword: str, entries: List[Dict[str, Any]]) -> dict:
             }
         }
         
-        # Add voting buttons for each entry
-        if entry.get('id'):
-            entry_block["accessory"] = {
-                "type": "button",
-                "text": {
-                    "type": "plain_text",
-                    "text": f"👍 {entry.get('score', 0):+d}" if entry.get('score', 0) != 0 else "👍 0"
-                },
-                "action_id": f"vote_entry_{entry['id']}",
-                "value": entry['id']
-            }
-        
         blocks.append(entry_block)
+        
+        # Add voting buttons for each entry (as separate action block)
+        if entry.get('id'):
+            voting_block = {
+                "type": "actions",
+                "block_id": f"voting_{entry['id']}",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "👍 Upvote"
+                        },
+                        "style": "primary",
+                        "action_id": f"upvote_{entry['id']}",
+                        "value": entry['id']
+                    },
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "👎 Downvote"
+                        },
+                        "style": "danger",  # Make downvote button red
+                        "action_id": f"downvote_{entry['id']}",
+                        "value": entry['id']
+                    }
+                ]
+            }
+            blocks.append(voting_block)
+            
+            # Add score as a context block (text only)
+            score_text = f"Score: {entry.get('score', 0):+d}" if entry.get('score', 0) != 0 else "Score: 0"
+            score_block = {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f"📊 {score_text}"
+                    }
+                ]
+            }
+            blocks.append(score_block)
         
         # Add divider between entries (except after the last one)
         if i < len(entries):
@@ -133,6 +164,7 @@ def format_entry_summary(index: int, entry: Dict[str, Any]) -> str:
     title = entry.get('title', 'Untitled')
     score = entry.get('score', 0)
     ai_summary = entry.get('ai_summary')
+    target_audience = entry.get('target_audience')
     url = entry.get('url')
     tags = entry.get('tags', [])
     
@@ -149,6 +181,10 @@ def format_entry_summary(index: int, entry: Dict[str, Any]) -> str:
         if len(summary) > 150:
             summary = summary[:147] + "..."
         result_parts.append(f"_{summary}_")
+    
+    # Add target audience if present
+    if target_audience:
+        result_parts.append(f"👥 Best for: {target_audience}")
     
     # Add tags
     if tags:
