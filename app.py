@@ -23,6 +23,7 @@ from handlers.search_handler import register_search_handler
 from handlers.list_handler import register_list_handler
 from handlers.admin_handler import register_admin_handler
 from handlers.tags_handler import register_tags_handler
+from handlers.suggest_tag_handler import register_suggest_tag_handler
 
 # Configure logging
 logging.basicConfig(
@@ -127,6 +128,7 @@ def create_app():
     register_list_handler(app)
     register_admin_handler(app)
     register_tags_handler(app)
+    register_suggest_tag_handler(app)  # Register tag suggestion handlers
     
     # Register global voting handlers for buttons
     register_global_voting_handlers(app)
@@ -144,12 +146,14 @@ def create_app():
 • `/aitools-search <keyword>` - Search for tools by keyword
 • `/aitools-list [tag]` - List trending tools (optionally filtered by tag)
 • `/aitools-tags` - Show all available tags for filtering
+• `/aitools-suggest-tag <entry_id> <tag>` - Suggest community tags for entries
 
 *Examples:*
 • `/aitools-add Aider | https://aider.chat/`
 • `/aitools-search code-assistant`
 • `/aitools-list python`
 • `/aitools-tags`
+• `/aitools-suggest-tag abc12345 machine-learning`
 
 Need help? The bot will automatically generate summaries and tags for tools you add! 🚀
         """

@@ -114,12 +114,21 @@ def format_list_results(tag: Optional[str], entries: List[Dict[str, Any]]) -> di
                         "style": "danger",  # Make downvote button red
                         "action_id": f"downvote_{entry['id']}",
                         "value": entry['id']
+                    },
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "🏷️ Suggest Tag"
+                        },
+                        "action_id": f"suggest_tag_{entry['id']}",
+                        "value": entry['id']
                     }
                 ]
             }
             blocks.append(voting_block)
             
-            # Add score as a context block (text only)
+            # Add score as a context block
             score_text = f"Score: {entry.get('score', 0):+d}" if entry.get('score', 0) != 0 else "Score: 0"
             score_block = {
                 "type": "context",

@@ -54,6 +54,12 @@ Allows users to suggest new tags for entries:
 - Displays interactive voting interface with 👍/👎 buttons
 - Shows current vote counts and net score
 
+**Entry ID Discovery:**
+Users can easily suggest tags without needing to know entry IDs:
+- **🏷️ Suggest Tag buttons** in `/aitools-list` results provide one-click access
+- **Button click experience** shows entry details and pre-formatted command
+- **Admin interface** displays full IDs for reference when needed
+
 ### `/aitools-tags`
 Enhanced tags display now includes:
 - Core predefined tags organized by category
@@ -90,6 +96,12 @@ Features:
 - Auto-promotion triggered after each vote
 
 ## Integration Points
+
+### Enhanced Entry Lists (`/aitools-list`)
+- **🏷️ Suggest Tag buttons** added to each entry for one-click access
+- **Button click experience**: Shows tag suggestion prompt with entry details and pre-formatted command
+- **Seamless workflow**: No need to manually copy/paste entry IDs
+- **Clean interface**: Focused on tool information without technical clutter
 
 ### Tags Handler Enhancement
 - `/aitools-tags` now displays approved community tags

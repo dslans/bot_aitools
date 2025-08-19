@@ -14,7 +14,10 @@ from config.tags import CORE_TAGS
 logger = logging.getLogger(__name__)
 
 def register_suggest_tag_handler(app: App):
-    """Register the /aitools-suggest-tag command handler."""
+    """Register the /aitools-suggest-tag command handler and voting handlers."""
+    
+    # Register voting handlers first
+    register_tag_voting_handlers(app)
     
     @app.command("/aitools-suggest-tag")
     def handle_suggest_tag_command(ack, say, command):
@@ -292,4 +295,69 @@ def register_tag_voting_handlers(app: App):
             logger.error(f"Error handling tag downvote: {e}")
             say("❌ An error occurred while voting.")
     
-    logger.info("✅ Tag voting handlers registered successfully")
+    # Handle "Suggest Tag" buttons from list entries
+    @app.action(re.compile(r"suggest_tag_.+"))
+    def handle_suggest_tag_button(ack, body, respond):
+        """Handle suggest tag buttons from entry lists."""
+        ack()
+        
+        try:
+            action = body.get('actions', [{}])[0]
+            entry_id = action.get('value')
+            user_id = body.get('user', {}).get('id')
+            
+            # Get entry details for display
+            entry = bigquery_service.get_entry_by_id(entry_id)
+            if not entry:
+                respond({
+                    "text": f"❌ Entry not found.",
+                    "response_type": "ephemeral"
+                })
+                return
+            
+            # Show modal or simple prompt for tag suggestion
+            suggest_tag_prompt(respond, entry, user_id)
+            
+        except Exception as e:
+            logger.error(f"Error handling suggest tag button: {e}")
+            respond({
+                "text": f"❌ Error: {str(e)}",
+                "response_type": "ephemeral"
+            })
+    
+def suggest_tag_prompt(respond, entry: dict, user_id: str):
+    """Show a tag suggestion prompt for an entry."""
+    entry_title = entry['title'][:50] + "..." if len(entry['title']) > 50 else entry['title']
+    
+    respond({
+        "text": f"Suggest a tag for {entry_title}",
+        "blocks": [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"🏷️ **Suggest a Tag**\n\n" +
+                           f"**Tool:** {entry['title']}\n" +
+                           f"**ID:** `{entry['id']}`\n\n" +
+                           f"To suggest a tag, use:\n" +
+                           f"`/aitools-suggest-tag {entry['id']} your-tag-name`\n\n" +
+                           f"💡 *Examples:*\n" +
+                           f"• `/aitools-suggest-tag {entry['id']} machine-learning`\n" +
+                           f"• `/aitools-suggest-tag {entry['id']} python-library`\n" +
+                           f"• `/aitools-suggest-tag {entry['id']} no-code-tool`"
+                }
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": "Use lowercase, hyphen-separated words. Check existing tags with `/aitools-tags`"
+                    }
+                ]
+            }
+        ],
+        "response_type": "ephemeral"
+    })
+
+logger.info("✅ Tag suggestion handlers registered successfully")
