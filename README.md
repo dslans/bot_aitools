@@ -1,6 +1,6 @@
 # AI Tools Wiki Slack Bot 🤖
 
-**Production-Ready Community Wiki** with Reddit-style voting and democratic tagging for AI coding tools. Team members can contribute, vote, and collaboratively tag tools to build a curated knowledge base.
+**A Community Wiki for AI Tools** with Reddit-style voting and democratic tagging for AI coding tools. Team members can contribute, vote, and collaboratively tag tools to build a curated knowledge base. Integrate security policy documentation around AI to determine if the tool is approved for use at your workplace.
 
 ## ✨ Key Features
 

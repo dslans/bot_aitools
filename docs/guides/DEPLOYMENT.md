@@ -14,7 +14,7 @@ Before deploying, ensure you have:
 
 ## 🚀 Quick Deploy (Recommended)
 
-For fastest setup, use our automated deployment script:
+For fastest setup, use the automated deployment script:
 
 ```bash
 # 1. Set up Google Cloud project and authenticate
