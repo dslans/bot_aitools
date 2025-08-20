@@ -203,3 +203,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Internal development documentation
+docs/README.md
+docs/guides/PROJECT_PLAN.md
+docs/guides/TAG_SUGGESTION_UX_GUIDE.md
+docs/guides/COMMUNITY_TAG_SYSTEM.md
