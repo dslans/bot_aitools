@@ -47,6 +47,15 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 1
 fi
 
+# Grant Secret Manager access to the service account
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+
+echo "🔐 Granting Secret Manager Secret Accessor role to $SERVICE_ACCOUNT..."
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${SERVICE_ACCOUNT}" \
+    --role="roles/secretmanager.secretAccessor" --condition=None > /dev/null
+
 # Deploy to Cloud Run
 echo "🚀 Deploying to Cloud Run..."
 gcloud run deploy aitools-wiki-bot \
@@ -60,7 +69,7 @@ gcloud run deploy aitools-wiki-bot \
     --min-instances 0 \
     --max-instances 10 \
     --timeout 300 \
-    --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT_ID,BIGQUERY_DATASET=aitools_wiki_prod,ENVIRONMENT=production" \
+    --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT_ID,ENVIRONMENT=production" \
     --set-secrets "SLACK_BOT_TOKEN=slack-bot-token:latest,SLACK_SIGNING_SECRET=slack-signing-secret:latest"
 
 # Get the service URL

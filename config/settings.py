@@ -5,8 +5,16 @@ Configuration settings for AI Tools Wiki Bot.
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables based on environment
+# Check if we're in production (Cloud Run sets this)
+env_var = os.getenv('ENVIRONMENT')
+if env_var == 'production':
+    # In production, force load .env.production and override any existing env vars
+    # This ensures our production config takes precedence
+    load_dotenv('.env.production', override=True)
+else:
+    # Load default .env file for development
+    load_dotenv()
 
 class Settings:
     """Application settings."""

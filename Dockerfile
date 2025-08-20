@@ -25,4 +25,4 @@ USER appuser
 EXPOSE 8080
 
 # Use gunicorn for production
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--timeout", "60", "--worker-class", "sync", "app:flask_app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--timeout", "300", "--worker-class", "sync", "app:flask_app"]

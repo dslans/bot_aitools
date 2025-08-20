@@ -345,9 +345,17 @@ def setup_flask_routes(slack_app):
     @flask_app.route("/slack/events", methods=["POST"])
     def slack_events():
         """Handle Slack events in production."""
+        # Let the SlackRequestHandler handle all requests
+        # It will automatically handle URL verification challenges
         return handler.handle(request)
     
     logger.info("Flask routes configured for production deployment")
+
+# Initialize Flask app for gunicorn when module is imported
+if os.getenv('ENVIRONMENT') == 'production':
+    slack_app = create_app()
+    if slack_app:
+        setup_flask_routes(slack_app)
 
 def main():
     """Main application entry point."""
