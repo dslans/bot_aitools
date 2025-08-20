@@ -26,6 +26,7 @@ echo -n 'your-bot-token' | gcloud secrets create slack-bot-token --data-file=-
 echo -n 'your-signing-secret' | gcloud secrets create slack-signing-secret --data-file=-
 
 # 3. Set up database
+uv pip install -r requirements.txt 
 python scripts/setup.py
 
 # 4. Deploy with the automated script
