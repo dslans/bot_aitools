@@ -29,6 +29,7 @@ gcloud services enable run.googleapis.com
 gcloud services enable bigquery.googleapis.com
 gcloud services enable cloudbuild.googleapis.com
 gcloud services enable secretmanager.googleapis.com
+gcloud services enable aiplatform.googleapis.com
 
 # Prompt user to verify secrets exist
 echo ""
@@ -55,6 +56,11 @@ echo "🔐 Granting Secret Manager Secret Accessor role to $SERVICE_ACCOUNT..."
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:${SERVICE_ACCOUNT}" \
     --role="roles/secretmanager.secretAccessor" --condition=None > /dev/null
+
+echo "🤖 Granting AI Platform User role to $SERVICE_ACCOUNT..."
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${SERVICE_ACCOUNT}" \
+    --role="roles/aiplatform.user" --condition=None > /dev/null
 
 # Deploy to Cloud Run
 echo "🚀 Deploying to Cloud Run..."

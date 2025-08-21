@@ -44,6 +44,20 @@ def register_add_handler(app: App):
         
         # Process the entry
         try:
+            # Check for duplicate before processing (if it's a URL)
+            if scraper_service.is_valid_url(content):
+                existing_entry = bigquery_service.get_entry_by_url(content)
+                if existing_entry:
+                    # Get the existing entry with score for display
+                    existing_entry_with_score = bigquery_service.get_entry_with_score(existing_entry['id'])
+                    if existing_entry_with_score:
+                        say(f"🔄 This URL has already been added to the wiki!\n\n**Existing Entry:**")
+                        response = format_entry_response(existing_entry_with_score)
+                        say(response)
+                    else:
+                        say(f"🔄 This URL has already been added: **{existing_entry['title']}**\n\nUse `/aitools-list` to browse existing tools.")
+                    return
+            
             entry_id = process_add_entry(title, content, user_id)
             
             if entry_id:
@@ -110,7 +124,8 @@ def process_add_entry(title: str, content: str, user_id: str) -> Optional[str]:
         existing_entry = bigquery_service.get_entry_by_url(url)
         if existing_entry:
             logger.info(f"Found existing entry for URL: {url}")
-            return existing_entry['id']
+            # Return None to indicate duplicate found (handled in calling code)
+            return None
         
         # Scrape content from URL
         scraped_title, scraped_content = scraper_service.scrape_content(url)

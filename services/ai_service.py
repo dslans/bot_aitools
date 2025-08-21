@@ -58,8 +58,8 @@ class AIService:
                 model=settings.GEMINI_MODEL,
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    temperature=0.7,
-                    max_output_tokens=4000,  # Increased for gemini-2.5 thought tokens
+                    temperature=0.3,
+                    max_output_tokens=4000,
                 )
             )
             
@@ -74,12 +74,12 @@ class AIService:
                     if 'MAX_TOKENS' in finish_reason:
                         logger.warning("AI response hit token limit, trying with shorter prompt")
                         # Retry with a much shorter prompt
-                        short_prompt = f"Summarize this AI tool in 50 words: {title}. {content[:500]}"
+                        short_prompt = f"Summarize this AI tool in 50 words or less: {title}. {content[:500]}"
                         response = await self.client.aio.models.generate_content(
                             model=settings.GEMINI_MODEL,
                             contents=short_prompt,
                             config=types.GenerateContentConfig(
-                                temperature=0.7,
+                                temperature=0.3,
                                 max_output_tokens=1000,
                             )
                         )
@@ -154,6 +154,32 @@ TAGS: [tag1, tag2, tag3]"""
     
     def generate_summary_and_tags_sync(self, title: str, content: str) -> Tuple[Optional[str], Optional[str], List[str]]:
         """Synchronous wrapper for generate_summary_and_tags."""
+        import concurrent.futures
+        import threading
+        
+        try:
+            # Check if there's an existing event loop
+            loop = asyncio.get_running_loop()
+            # If we're in an async context, we need to run in a separate thread
+            logger.info("Running AI operation in thread pool to avoid blocking event loop")
+            
+            # Create a thread pool executor to run the async function
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(self._run_in_new_loop, title, content)
+                return future.result(timeout=30)  # 30 second timeout
+                
+        except RuntimeError:
+            # No running loop, safe to use asyncio.run()
+            return asyncio.run(self.generate_summary_and_tags(title, content))
+        except concurrent.futures.TimeoutError:
+            logger.error("AI service timed out")
+            return None, None, []
+        except Exception as e:
+            logger.error(f"Error in AI service sync wrapper: {e}")
+            return None, None, []
+    
+    def _run_in_new_loop(self, title: str, content: str) -> Tuple[Optional[str], Optional[str], List[str]]:
+        """Run the async method in a new event loop in a separate thread."""
         return asyncio.run(self.generate_summary_and_tags(title, content))
 
 # Global AI service instance

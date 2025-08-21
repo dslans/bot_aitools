@@ -25,18 +25,10 @@ gcloud auth login
 echo -n 'your-bot-token' | gcloud secrets create slack-bot-token --data-file=-
 echo -n 'your-signing-secret' | gcloud secrets create slack-signing-secret --data-file=-
 
-# 3. Grant AI Platform User role to default compute service account
-PROJECT_ID=$(gcloud config get-value project)
-PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
-    --role="roles/aiplatform.user"
-
-# 4. Install Python dependencies and set up database
-uv pip install -r requirements.txt 
+# 3. Set up database
 python scripts/setup.py
 
-# 4. Deploy with the automated script
+# 4. Deploy with the automated script (handles API enabling and permissions automatically)
 ./scripts/deploy.sh
 ```
 

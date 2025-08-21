@@ -3,15 +3,27 @@ Configuration settings for AI Tools Wiki Bot.
 """
 
 import os
+import logging
+from pathlib import Path
 from dotenv import load_dotenv
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables based on environment
 # Check if we're in production (Cloud Run sets this)
 env_var = os.getenv('ENVIRONMENT')
+
 if env_var == 'production':
-    # In production, force load .env.production and override any existing env vars
-    # This ensures our production config takes precedence
-    load_dotenv('.env.production', override=True)
+    # In production, load .env.prod which contains non-sensitive config
+    # Sensitive values come from Google Secret Manager
+    env_file = Path('.env.prod')
+    if env_file.exists():
+        load_dotenv(env_file, override=False)  # Don't override secrets from Secret Manager
+        logger.info(f"Loaded production config from .env.prod")
+    else:
+        logger.warning(f".env.prod not found, using defaults")
 else:
     # Load default .env file for development
     load_dotenv()

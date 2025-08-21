@@ -132,7 +132,8 @@ tags: tag1, tag2, tag3 (optional)
                 title = entry_title[:50] + "..." if len(entry_title) > 50 else entry_title
                 
                 entry_summary = entry.get('ai_summary') or 'No AI summary'
-                summary = entry_summary[:100] + "..." if len(entry_summary) > 100 else entry_summary
+                # Don't truncate summary - show full description
+                summary = entry_summary
                 
                 entry_tags = entry.get('tags') or []
                 tags_text = ", ".join(entry_tags[:3]) if entry_tags else 'No tags'
@@ -141,6 +142,16 @@ tags: tag1, tag2, tag3 (optional)
                 
                 entry_audience = entry.get('target_audience') or 'No target audience'
                 audience = entry_audience[:50] + "..." if len(entry_audience) > 50 else entry_audience
+                
+                # Add security information
+                security_display = entry.get('security_display') or 'No security evaluation'
+                security_status = entry.get('security_status', '')
+                security_emoji = {
+                    'approved': '✅',
+                    'restricted': '⚠️', 
+                    'prohibited': '🚫',
+                    'review': '🔍'
+                }.get(security_status, '❓')
                 
                 # Safely handle other fields
                 entry_id = entry.get('id') or 'unknown'
@@ -167,6 +178,7 @@ tags: tag1, tag2, tag3 (optional)
 *Summary:* {summary}
 *Audience:* {audience}  
 *Tags:* {tags_text}
+*Security:* {security_emoji} {security_display}
 *Author:* <@{author_id}> | *Created:* {date_str}"""
                 
                 entry_blocks.append({

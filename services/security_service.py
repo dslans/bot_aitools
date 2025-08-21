@@ -231,6 +231,34 @@ Be specific but concise in the DISPLAY message. Focus on what users need to know
                                    tags: List[str],
                                    guidelines_url: str) -> Tuple[str, str]:
         """Synchronous wrapper for evaluate_tool_security."""
+        import concurrent.futures
+        
+        try:
+            # Check if there's an existing event loop
+            loop = asyncio.get_running_loop()
+            # If we're in an async context, we need to run in a separate thread
+            logger.info("Running security evaluation in thread pool to avoid blocking event loop")
+            
+            # Create a thread pool executor to run the async function
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(self._run_in_new_loop, title, url, description, ai_summary, tags, guidelines_url)
+                return future.result(timeout=30)  # 30 second timeout
+                
+        except RuntimeError:
+            # No running loop, safe to use asyncio.run()
+            return asyncio.run(self.evaluate_tool_security(
+                title, url, description, ai_summary, tags, guidelines_url
+            ))
+        except concurrent.futures.TimeoutError:
+            logger.error("Security service timed out")
+            return "review", "⏳ Security evaluation timed out"
+        except Exception as e:
+            logger.error(f"Error in security service sync wrapper: {e}")
+            return "review", "⏳ Security check failed"
+    
+    def _run_in_new_loop(self, title: str, url: Optional[str], description: Optional[str], 
+                        ai_summary: Optional[str], tags: List[str], guidelines_url: str) -> Tuple[str, str]:
+        """Run the async method in a new event loop in a separate thread."""
         return asyncio.run(self.evaluate_tool_security(
             title, url, description, ai_summary, tags, guidelines_url
         ))
