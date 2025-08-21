@@ -186,6 +186,11 @@ def format_entry_summary(index: int, entry: Dict[str, Any]) -> str:
     if target_audience:
         result_parts.append(f"👥 Best for: {target_audience}")
     
+    # Add security status if present
+    security_display = entry.get('security_display')
+    if security_display:
+        result_parts.append(f"🔒 {security_display}")
+    
     # Add tags
     if tags:
         tags_str = ', '.join(tags[:3])  # Show first 3 tags

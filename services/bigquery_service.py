@@ -290,6 +290,7 @@ class BigQueryService:
         query = f"""
         SELECT 
             e.id, e.title, e.url, e.description, e.ai_summary, e.target_audience, e.tags, e.author_id, e.created_at,
+            e.security_status, e.security_display,
             COALESCE(SUM(v.vote), 0) AS score
         FROM `{self.table_ids['entries']}` e
         LEFT JOIN `{self.table_ids['votes']}` v ON e.id = v.entry_id
@@ -297,7 +298,7 @@ class BigQueryService:
             LOWER(e.title) LIKE LOWER(CONCAT('%', @keyword, '%'))
             OR LOWER(e.ai_summary) LIKE LOWER(CONCAT('%', @keyword, '%'))
             OR @keyword IN UNNEST(e.tags)
-        GROUP BY e.id, e.title, e.url, e.description, e.ai_summary, e.target_audience, e.tags, e.author_id, e.created_at
+        GROUP BY e.id, e.title, e.url, e.description, e.ai_summary, e.target_audience, e.tags, e.author_id, e.created_at, e.security_status, e.security_display
         ORDER BY score DESC, e.created_at DESC
         LIMIT @limit
         """
@@ -325,6 +326,8 @@ class BigQueryService:
                     'tags': list(row.tags) if row.tags else [],
                     'author_id': row.author_id,
                     'created_at': row.created_at,
+                    'security_status': getattr(row, 'security_status', None),
+                    'security_display': getattr(row, 'security_display', None),
                     'score': int(row.score)
                 })
             
@@ -360,11 +363,12 @@ class BigQueryService:
         query = f"""
         SELECT 
             e.id, e.title, e.url, e.description, e.ai_summary, e.target_audience, e.tags, e.author_id, e.created_at,
+            e.security_status, e.security_display,
             COALESCE(SUM(v.vote), 0) AS score
         FROM `{self.table_ids['entries']}` e
         LEFT JOIN `{self.table_ids['votes']}` v ON e.id = v.entry_id
         {where_clause}
-        GROUP BY e.id, e.title, e.url, e.description, e.ai_summary, e.target_audience, e.tags, e.author_id, e.created_at
+        GROUP BY e.id, e.title, e.url, e.description, e.ai_summary, e.target_audience, e.tags, e.author_id, e.created_at, e.security_status, e.security_display
         ORDER BY score DESC, e.created_at DESC
         LIMIT @limit
         """
@@ -387,6 +391,8 @@ class BigQueryService:
                     'tags': list(row.tags) if row.tags else [],
                     'author_id': row.author_id,
                     'created_at': row.created_at,
+                    'security_status': getattr(row, 'security_status', None),
+                    'security_display': getattr(row, 'security_display', None),
                     'score': int(row.score)
                 })
             
@@ -684,12 +690,13 @@ class BigQueryService:
         SELECT 
             e.id, e.title, e.url, e.description, e.ai_summary, 
             e.target_audience, e.tags, e.author_id, e.created_at,
+            e.security_status, e.security_display,
             COALESCE(SUM(v.vote), 0) AS score,
             COUNT(CASE WHEN v.vote = 1 THEN 1 END) AS upvotes,
             COUNT(CASE WHEN v.vote = -1 THEN 1 END) AS downvotes
         FROM `{self.table_ids['entries']}` e
         LEFT JOIN `{self.table_ids['votes']}` v ON e.id = v.entry_id
-        GROUP BY e.id, e.title, e.url, e.description, e.ai_summary, e.target_audience, e.tags, e.author_id, e.created_at
+        GROUP BY e.id, e.title, e.url, e.description, e.ai_summary, e.target_audience, e.tags, e.author_id, e.created_at, e.security_status, e.security_display
         ORDER BY score DESC, e.created_at DESC
         LIMIT @limit
         """
@@ -718,6 +725,8 @@ class BigQueryService:
                         'tags': list(getattr(row, 'tags', [])) if getattr(row, 'tags', None) else [],
                         'author_id': getattr(row, 'author_id', None),
                         'created_at': getattr(row, 'created_at', None),
+                        'security_status': getattr(row, 'security_status', None),
+                        'security_display': getattr(row, 'security_display', None),
                         'score': int(getattr(row, 'score', 0)),
                         'upvotes': int(getattr(row, 'upvotes', 0)),
                         'downvotes': int(getattr(row, 'downvotes', 0))

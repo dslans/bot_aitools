@@ -209,7 +209,7 @@ Need help? The bot will automatically generate summaries and tags for tools you 
                 "📝 **Examples:**\n"
                 "• `add Cursor | https://cursor.sh`\n"
                 "• `search code-assistant`\n"
-                "• `list python`\n\n"
+                "• `list image-generation`\n\n"
                 "Or use slash commands like `/aitools-add`!"
             )
             

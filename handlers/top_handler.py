@@ -81,6 +81,11 @@ def handle_aitools_top(ack, say, client, command, context):
             if target_audience and len(target_audience) > 2:
                 description_parts.append(f"*Best for:* {target_audience}")
             
+            # Add security status if present
+            security_display = entry.get('security_display')
+            if security_display:
+                description_parts.append(f"*Security:* {security_display}")
+            
             if tags and len(tags) > 0:
                 # Limit to first 3 tags for display
                 display_tags = tags[:3]
