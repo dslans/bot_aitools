@@ -199,6 +199,3 @@ The bot will automatically:
 3. Make your changes
 4. Submit a pull request
 
-## License
-
-MIT License
