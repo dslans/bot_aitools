@@ -24,7 +24,7 @@ Experimental project to create a slackbot and learn how Warp works. I intentiona
 /aitools
 
 # Add a new tool (AI will analyze and categorize it)
-/aitools-add Cursor | https://cursor.sh
+/aitools-add Cursor | https://cursor.com
 
 # Search for tools
 /aitools-search code-generation
