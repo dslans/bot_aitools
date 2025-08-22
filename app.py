@@ -248,7 +248,7 @@ def handle_message_add(message, say, user_id):
     if not content:
         say("❌ Please provide a title and URL/description.\n"
             "Format: `add <title> | <url or description>`\n"
-            "Example: `add Cursor | https://cursor.sh`")
+            "Example: `add Cursor | https://cursor.com/`")
         return
     
     # Parse title and content
