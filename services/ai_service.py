@@ -79,13 +79,13 @@ class AIService:
                     if 'MAX_TOKENS' in finish_reason:
                         logger.warning("AI response hit token limit, trying with shorter prompt")
                         # Retry with a much shorter prompt
-                        short_prompt = f"Summarize this AI tool in 50 words or less: {title}. {content[:500]}"
+                        short_prompt = f"Summarize this AI tool in 150 words or less: {title}. {content[:500]}"
                         response = await client.aio.models.generate_content(
                             model=settings.GEMINI_MODEL,
                             contents=short_prompt,
                             config=types.GenerateContentConfig(
                                 temperature=0.3,
-                                max_output_tokens=1000,
+                                max_output_tokens=3000,
                             )
                         )
                         logger.debug(f"Retry response text: {response.text}")
