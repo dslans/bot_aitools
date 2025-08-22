@@ -5,6 +5,7 @@ Security service for checking tool approval status using AI analysis.
 import logging
 import requests
 import asyncio
+import threading
 from typing import Dict, Tuple, Optional, List
 from datetime import datetime, timedelta
 
@@ -20,25 +21,28 @@ class SecurityService:
     
     def __init__(self):
         """Initialize the security service."""
-        self.client = None
+        self._thread_local = threading.local()
         self.guidelines_cache = None
         self.guidelines_cache_time = None
         self.cache_duration = timedelta(hours=24)  # Cache guidelines for 24 hours
-        self._initialize_ai_client()
     
-    def _initialize_ai_client(self):
-        """Initialize the Gemini AI client."""
-        try:
-            self.client = genai.Client(
-                vertexai=True,
-                project=settings.GOOGLE_CLOUD_PROJECT,
-                location=settings.VERTEX_LOCATION
-            )
-            logger.info("Security AI service initialized successfully")
-        except Exception as e:
-            logger.warning(f"Security AI service initialization failed: {e}")
-            logger.warning("Security evaluations will be unavailable")
-            self.client = None
+    def _get_client(self):
+        """Get or create a Gemini client for the current thread."""
+        # Check if we have a client for this thread
+        if not hasattr(self._thread_local, 'client'):
+            try:
+                self._thread_local.client = genai.Client(
+                    vertexai=True,
+                    project=settings.GOOGLE_CLOUD_PROJECT,
+                    location=settings.VERTEX_LOCATION
+                )
+                logger.info(f"Security AI service client initialized successfully for thread {threading.current_thread().name}")
+            except Exception as e:
+                logger.warning(f"Security AI service client initialization failed for thread {threading.current_thread().name}: {e}")
+                logger.warning("Security evaluations will be unavailable")
+                self._thread_local.client = None
+        
+        return self._thread_local.client
     
     def fetch_guidelines(self, guidelines_url: str) -> Optional[str]:
         """
@@ -105,7 +109,8 @@ class SecurityService:
             - status: 'approved', 'restricted', 'prohibited', or 'review'
             - display_text: Brief, user-friendly explanation (max 100 chars)
         """
-        if not self.client:
+        client = self._get_client()
+        if not client:
             logger.warning("AI client not available for security evaluation")
             return "review", "⏳ Pending security review"
         
@@ -122,7 +127,7 @@ class SecurityService:
             )
             
             # Call Gemini AI
-            response = await self.client.aio.models.generate_content(
+            response = await client.aio.models.generate_content(
                 model=settings.GEMINI_MODEL,
                 contents=prompt,
                 config=types.GenerateContentConfig(

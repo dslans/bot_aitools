@@ -4,6 +4,7 @@ Google Gen AI service for generating summaries and tags.
 
 import asyncio
 import logging
+import threading
 from typing import Tuple, List, Optional
 from google import genai
 from google.genai import types
@@ -18,22 +19,25 @@ class AIService:
     
     def __init__(self):
         """Initialize the AI service."""
-        self.client = None
-        self._initialize_client()
+        self._thread_local = threading.local()
     
-    def _initialize_client(self):
-        """Initialize the Gemini client."""
-        try:
-            self.client = genai.Client(
-                vertexai=True,
-                project=settings.GOOGLE_CLOUD_PROJECT,
-                location=settings.VERTEX_LOCATION
-            )
-            logger.info("AI service initialized successfully")
-        except Exception as e:
-            logger.warning(f"AI service initialization failed: {e}")
-            logger.warning("Bot will continue without AI features")
-            self.client = None
+    def _get_client(self):
+        """Get or create a Gemini client for the current thread."""
+        # Check if we have a client for this thread
+        if not hasattr(self._thread_local, 'client'):
+            try:
+                self._thread_local.client = genai.Client(
+                    vertexai=True,
+                    project=settings.GOOGLE_CLOUD_PROJECT,
+                    location=settings.VERTEX_LOCATION
+                )
+                logger.info(f"AI service client initialized successfully for thread {threading.current_thread().name}")
+            except Exception as e:
+                logger.warning(f"AI service client initialization failed for thread {threading.current_thread().name}: {e}")
+                logger.warning("Bot will continue without AI features")
+                self._thread_local.client = None
+        
+        return self._thread_local.client
     
     async def generate_summary_and_tags(self, title: str, content: str) -> Tuple[Optional[str], Optional[str], List[str]]:
         """
@@ -46,15 +50,16 @@ class AIService:
         Returns:
             Tuple of (summary, target_audience, tags_list)
         """
-        if not self.client:
-            logger.error("AI client not initialized")
+        client = self._get_client()
+        if not client:
+            logger.error("AI client not available")
             return None, None, []
         
         try:
             prompt = self._build_prompt(title, content)
             logger.debug(f"Generated prompt: {prompt[:200]}...")
             
-            response = await self.client.aio.models.generate_content(
+            response = await client.aio.models.generate_content(
                 model=settings.GEMINI_MODEL,
                 contents=prompt,
                 config=types.GenerateContentConfig(
@@ -75,7 +80,7 @@ class AIService:
                         logger.warning("AI response hit token limit, trying with shorter prompt")
                         # Retry with a much shorter prompt
                         short_prompt = f"Summarize this AI tool in 50 words or less: {title}. {content[:500]}"
-                        response = await self.client.aio.models.generate_content(
+                        response = await client.aio.models.generate_content(
                             model=settings.GEMINI_MODEL,
                             contents=short_prompt,
                             config=types.GenerateContentConfig(
