@@ -1,10 +1,14 @@
 # AI Tools Wiki Slack Bot 🤖
 
-**A Community Wiki for AI Tools** with Reddit-style voting and democratic tagging for AI coding tools. Team members can contribute, vote, and collaboratively tag tools to build a curated knowledge base. Integrate security policy documentation around AI to determine if the tool is approved for use at your workplace.
+**A Community Wiki for AI Tools** with Reddit-style voting and democratic tagging for AI coding tools. Team members can contribute, vote, and collaboratively tag tools to build a curated knowledge base. Features automated security evaluation using AI to determine if tools are approved, restricted, or prohibited based on your workplace security policies.
+
+## Motivation
+Experimental project to create a slackbot and learn how Warp works. I intentionally started with a project plan that would enable a coding assistant do all the heavy lifting. A voting system for AI tools seemed appropriate. 
 
 ## ✨ Key Features
 
 - 🤖 **AI-Powered Content**: Automatic tool summaries and tagging using Google Gemini
+- 🔒 **Security Evaluation**: Automated AI-powered security assessment against company policies
 - 📊 **Reddit-Style Voting**: Upvote/downvote tools directly in Slack with real-time scores  
 - 🏷️ **Democratic Tagging**: Community-driven tag suggestions with voting approval
 - 🔍 **Smart Search**: Find tools by keywords, tags, or content with relevance ranking
@@ -40,6 +44,7 @@
 - **🏷️ Tag Suggestions**: One-click tag suggestions via buttons
 - **📊 Live Scores**: Real-time community rankings
 - **🤖 AI Analysis**: Auto-generated summaries and categorization
+- **🔒 Security Indicators**: Visual status (approved ✅, restricted ⚠️, prohibited 🚫)
 
 ## 🚀 Quick Start Examples
 
@@ -49,8 +54,8 @@
 ```
 Bot response:
 ```
-✅ Added *Cursor*
-🔗 https://cursor.sh
+✅ Added *Cursor* 🔍 Requires security team review
+🔗 https://cursor.com
 📝 AI-powered code editor with GitHub Copilot integration...
 🏷️ Tags: code-editor, ai-assistant, vscode
 👍 0 | 👎 0 [Suggest Tag]
@@ -146,6 +151,11 @@ The bot will automatically:
 
 ```
 .
+├── .dockerignore                    # Docker ignore patterns
+├── .env.example                     # Environment variable template
+├── .env.prod.template               # Production environment template
+├── .gitignore                       # Git ignore patterns
+├── Dockerfile                       # Container configuration
 ├── app.py                           # Main application entry point
 ├── config/
 │   ├── settings.py                  # Configuration management
@@ -154,6 +164,7 @@ The bot will automatically:
 │   ├── ai_service.py                # Google Gen AI integration
 │   ├── bigquery_service.py           # BigQuery operations
 │   ├── scraper_service.py            # Web scraping functionality
+│   ├── security_service.py           # AI-powered security evaluation
 │   └── tag_suggestions_service.py    # Community tag system
 ├── handlers/
 │   ├── add_handler.py               # /aitools-add command
@@ -173,9 +184,8 @@ The bot will automatically:
 │       ├── PROJECT_PLAN.md          # Project roadmap and architecture
 │       ├── COMMUNITY_TAG_SYSTEM.md  # Tag system documentation
 │       └── TAG_SUGGESTION_UX_GUIDE.md # UX design guide
-├── migrations/
-│   └── create_tag_tables.sql        # Database schema migrations
 ├── scripts/
+│   ├── deploy.sh                    # Automated deployment script
 │   ├── setup.py                     # Complete database setup
 │   └── README.md                    # Setup documentation
 ├── requirements.txt                 # Python dependencies
